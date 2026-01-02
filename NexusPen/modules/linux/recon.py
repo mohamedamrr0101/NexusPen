@@ -70,9 +70,23 @@ class LinuxRecon:
     def _execute_live(self, cmd: List[str]) -> tuple:
         """Execute with live streaming output (no timeout, Ctrl+C to skip)."""
         if self.command_runner and self.config.get('verbosity', 0) >= 2:
-            # Use streaming mode for interactive/verbose
-            result = self.command_runner.execute_streaming(cmd)
-            return result.return_code == 0 if result.return_code is not None else False, result.stdout
+            # Import AircrackStylePanel if available
+            try:
+                from core.command_runner import AircrackStylePanel
+                
+                # Create panel and start it
+                panel = AircrackStylePanel()
+                panel.start()
+                
+                try:
+                    result = self.command_runner.execute_with_panel(cmd, panel)
+                    return result.return_code == 0 if result.return_code is not None else False, result.stdout
+                finally:
+                    panel.stop()
+            except ImportError:
+                # Fallback to streaming mode
+                result = self.command_runner.execute_streaming(cmd)
+                return result.return_code == 0 if result.return_code is not None else False, result.stdout
         else:
             # Fallback to regular execute
             return self._execute(cmd)

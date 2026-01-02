@@ -177,6 +177,157 @@ class LiveCommandPanel:
         )
 
 
+class AircrackStylePanel:
+    """
+    Aircrack-ng style live updating panel.
+    Shows commands running in a continuously refreshing display.
+    """
+    
+    def __init__(self):
+        self.current_command = ""
+        self.output_lines: List[str] = []
+        self.max_lines = 20
+        self.status = "idle"
+        self.stats = {
+            "commands_run": 0,
+            "commands_success": 0,
+            "commands_failed": 0,
+            "start_time": None,
+            "elapsed": 0.0
+        }
+        self.live: Optional[Live] = None
+        self._running = False
+        self._lock = threading.Lock()
+    
+    def start(self):
+        """Start the live display."""
+        self.stats["start_time"] = time.time()
+        self._running = True
+        self.live = Live(
+            self._render(),
+            console=console,
+            refresh_per_second=10,  # Fast refresh for smooth updates
+            transient=False
+        )
+        self.live.start()
+    
+    def stop(self):
+        """Stop the live display."""
+        self._running = False
+        if self.live:
+            self.live.stop()
+            self.live = None
+    
+    def set_command(self, cmd: str):
+        """Set the current running command."""
+        with self._lock:
+            self.current_command = cmd
+            self.output_lines = []
+            self.status = "running"
+            self.stats["commands_run"] += 1
+            self._refresh()
+    
+    def add_output(self, line: str):
+        """Add output line."""
+        with self._lock:
+            self.output_lines.append(line)
+            if len(self.output_lines) > self.max_lines:
+                self.output_lines = self.output_lines[-self.max_lines:]
+            self._refresh()
+    
+    def complete(self, success: bool = True):
+        """Mark current command as complete."""
+        with self._lock:
+            if success:
+                self.stats["commands_success"] += 1
+                self.status = "success"
+            else:
+                self.stats["commands_failed"] += 1
+                self.status = "failed"
+            self._refresh()
+    
+    def skip(self):
+        """Mark as skipped by Ctrl+C."""
+        with self._lock:
+            self.status = "skipped"
+            self._refresh()
+    
+    def _refresh(self):
+        """Refresh the display."""
+        if self.live:
+            self.stats["elapsed"] = time.time() - self.stats["start_time"] if self.stats["start_time"] else 0
+            self.live.update(self._render())
+    
+    def _render(self) -> Panel:
+        """Render the aircrack-style panel."""
+        # Build the table for stats
+        table = Table(show_header=False, box=None, padding=(0, 2))
+        table.add_column("Label", style="cyan")
+        table.add_column("Value", style="white")
+        
+        elapsed = self.stats["elapsed"]
+        elapsed_str = f"{int(elapsed // 60):02d}:{int(elapsed % 60):02d}"
+        
+        table.add_row("⏱️  Elapsed", elapsed_str)
+        table.add_row("📊 Commands", str(self.stats["commands_run"]))
+        table.add_row("✅ Success", str(self.stats["commands_success"]))
+        table.add_row("❌ Failed", str(self.stats["commands_failed"]))
+        
+        # Status indicator
+        status_icons = {
+            "idle": "[dim]⏸️  Idle[/dim]",
+            "running": "[cyan]▶️  Running[/cyan]",
+            "success": "[green]✅ Complete[/green]",
+            "failed": "[red]❌ Failed[/red]",
+            "skipped": "[yellow]⏭️  Skipped[/yellow]"
+        }
+        
+        # Build content
+        content = Text()
+        
+        # Header with stats
+        content.append("┌─ ")
+        content.append("NexusPen Terminal", style="bold cyan")
+        content.append(f" ─ {status_icons.get(self.status, '')} ─ ")
+        content.append(f"[{elapsed_str}]", style="dim")
+        content.append(f" ─ Press ", style="dim")
+        content.append("Ctrl+C", style="bold yellow")
+        content.append(" to skip ─┐\n", style="dim")
+        
+        # Current command
+        if self.current_command:
+            content.append("│ ", style="dim")
+            content.append("$ ", style="green")
+            content.append(f"{self.current_command[:70]}\n", style="bold white")
+        
+        content.append("├" + "─" * 74 + "┤\n", style="dim")
+        
+        # Output lines
+        if self.output_lines:
+            for line in self.output_lines[-15:]:  # Show last 15 lines
+                content.append("│ ", style="dim")
+                display_line = line[:72] if len(line) > 72 else line
+                content.append(f"{display_line}\n", style="white")
+        else:
+            content.append("│ ", style="dim")
+            content.append("[Waiting for output...]\n", style="dim italic")
+        
+        # Pad to minimum height for consistent look
+        line_count = len(self.output_lines) if self.output_lines else 1
+        for _ in range(max(0, 10 - line_count)):
+            content.append("│\n", style="dim")
+        
+        content.append("└" + "─" * 74 + "┘", style="dim")
+        
+        return Panel(
+            Group(table, content),
+            title="[bold white on blue] 🖥️  LIVE TERMINAL [/bold white on blue]",
+            subtitle="[dim]Real-time command execution[/dim]",
+            border_style="blue",
+            expand=True
+        )
+
+
 class CommandRunner:
     """
     Smart command runner with live output and tool management integration.
@@ -474,6 +625,110 @@ class CommandRunner:
             result.end_time = datetime.now()
             console.print(f"│ [red]❌ Error: {str(e)[:55]}[/red]" + " " * max(0, 56 - len(str(e))) + "│")
             console.print("╚" + "═" * 68 + "╝")
+        
+        return result
+    
+    def execute_with_panel(self, cmd: List[str], panel: 'AircrackStylePanel') -> CommandResult:
+        """
+        Execute command with an AircrackStylePanel for live updates.
+        No timeout - user can press Ctrl+C to skip.
+        
+        Args:
+            cmd: Command and arguments as a list
+            panel: AircrackStylePanel instance for live display
+        
+        Returns:
+            CommandResult with execution details
+        """
+        cmd_str = ' '.join(cmd)
+        tool_name = cmd[0]
+        
+        result = CommandResult(
+            command=cmd,
+            status=CommandStatus.PENDING,
+            start_time=datetime.now()
+        )
+        
+        # Set command in panel
+        panel.set_command(cmd_str)
+        
+        # Check if tool exists
+        if self.tool_manager:
+            tool_path = self.tool_manager.check_tool(tool_name)
+            if not tool_path:
+                result.status = CommandStatus.TOOL_NOT_FOUND
+                result.end_time = datetime.now()
+                panel.add_output(f"⚠️ Tool not found: {tool_name}")
+                install_cmd = self.tool_manager.get_install_command(tool_name)
+                if install_cmd:
+                    panel.add_output(f"Install with: {install_cmd}")
+                panel.complete(success=False)
+                return result
+        
+        # Execute with streaming
+        try:
+            start_time = time.time()
+            stdout_lines = []
+            
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1
+            )
+            
+            # Stream output - NO TIMEOUT
+            try:
+                for line in iter(process.stdout.readline, ''):
+                    line = line.rstrip()
+                    if line:
+                        stdout_lines.append(line)
+                        panel.add_output(line)
+                
+                process.wait()
+                
+            except KeyboardInterrupt:
+                # User pressed Ctrl+C
+                process.terminate()
+                try:
+                    process.wait(timeout=2)
+                except:
+                    process.kill()
+                
+                result.status = CommandStatus.SKIPPED
+                result.end_time = datetime.now()
+                result.duration = time.time() - start_time
+                result.stdout = '\n'.join(stdout_lines)
+                panel.skip()
+                return result
+            
+            # Completed
+            duration = time.time() - start_time
+            result.duration = duration
+            result.end_time = datetime.now()
+            result.stdout = '\n'.join(stdout_lines)
+            result.return_code = process.returncode
+            
+            if process.returncode == 0:
+                result.status = CommandStatus.SUCCESS
+                panel.complete(success=True)
+            else:
+                result.status = CommandStatus.FAILED
+                panel.complete(success=False)
+            
+        except FileNotFoundError:
+            result.status = CommandStatus.TOOL_NOT_FOUND
+            result.end_time = datetime.now()
+            panel.add_output(f"❌ Command not found: {tool_name}")
+            panel.complete(success=False)
+            
+        except Exception as e:
+            result.status = CommandStatus.FAILED
+            result.stderr = str(e)
+            result.end_time = datetime.now()
+            panel.add_output(f"❌ Error: {str(e)}")
+            panel.complete(success=False)
         
         return result
 

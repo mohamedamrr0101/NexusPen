@@ -70,23 +70,13 @@ class LinuxRecon:
     def _execute_live(self, cmd: List[str]) -> tuple:
         """Execute with live streaming output (no timeout, Ctrl+C to skip)."""
         if self.command_runner and self.config.get('verbosity', 0) >= 2:
-            # Import AircrackStylePanel if available
             try:
-                from core.command_runner import AircrackStylePanel
-                
-                # Create panel and start it
-                panel = AircrackStylePanel()
-                panel.start()
-                
-                try:
-                    result = self.command_runner.execute_with_panel(cmd, panel)
-                    return result.return_code == 0 if result.return_code is not None else False, result.stdout
-                finally:
-                    panel.stop()
-            except ImportError:
-                # Fallback to streaming mode
+                # Use streaming mode for real-time output
                 result = self.command_runner.execute_streaming(cmd)
-                return result.return_code == 0 if result.return_code is not None else False, result.stdout
+                return result.return_code == 0 if result.return_code is not None else False, result.stdout or ""
+            except Exception as e:
+                console.print(f"[red]Error in streaming execution: {e}[/red]")
+                return self._execute(cmd)
         else:
             # Fallback to regular execute
             return self._execute(cmd)
@@ -314,13 +304,10 @@ class LinuxRecon:
         
         try:
             # Check anonymous login
-            # Using nmap instead for reliability
             cmd = ['nmap', '--script', 'ftp-anon', '-p', str(port), self.target]
-            if self.config.get('verbosity', 0) > 0:
-                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+            success, stdout = self._execute_live(cmd)
             
-            if 'Anonymous FTP login allowed' in result.stdout:
+            if 'Anonymous FTP login allowed' in stdout:
                 ftp_info['anonymous'] = True
                 self.findings.append(LinuxFinding(
                     severity='medium',
@@ -332,7 +319,7 @@ class LinuxRecon:
                 
             return ftp_info
             
-        except (subprocess.TimeoutExpired, FileNotFoundError):
+        except Exception:
             return None
     
     def _check_smtp(self, port: int = 25) -> Optional[Dict]:
@@ -454,11 +441,9 @@ class LinuxRecon:
         """Check for Shellshock vulnerability."""
         try:
             cmd = ['nmap', '--script', 'http-shellshock', '-p', '80,443,8080', self.target]
-            if self.config.get('verbosity', 0) > 0:
-                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            success, stdout = self._execute_live(cmd)
             
-            if 'VULNERABLE' in result.stdout:
+            if 'VULNERABLE' in stdout:
                 self.findings.append(LinuxFinding(
                     severity='critical',
                     title='Shellshock Vulnerability (CVE-2014-6271)',
@@ -469,7 +454,7 @@ class LinuxRecon:
                     remediation='Update bash to a patched version'
                 ))
                 
-        except (subprocess.TimeoutExpired, FileNotFoundError):
+        except Exception:
             pass
     
     def check_dirty_cow(self):

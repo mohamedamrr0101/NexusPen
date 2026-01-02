@@ -10,7 +10,7 @@ import threading
 import time
 import queue
 from typing import Dict, List, Optional, Callable, Tuple
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, asdict
 from enum import Enum
 from datetime import datetime
 

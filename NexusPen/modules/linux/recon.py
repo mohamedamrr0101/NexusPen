@@ -130,11 +130,11 @@ class LinuxRecon:
             return ssh_info
         
         try:
-            # Banner grabbing
-            cmd = ['nc', '-w', '3', self.target, '22']
+            # Banner grabbing with longer timeout
+            cmd = ['nc', '-w', '10', self.target, '22']
             if self.config.get('verbosity', 0) > 0:
                 console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
             
             if result.stdout:
                 ssh_info['version'] = result.stdout.strip()
@@ -161,7 +161,7 @@ class LinuxRecon:
             cmd = ['ssh-audit', '-j', self.target]
             if self.config.get('verbosity', 0) > 0:
                 console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
             
             if result.returncode == 0:
                 try:
@@ -202,7 +202,7 @@ class LinuxRecon:
             cmd = ['nmap', '--script', 'ssh-auth-methods', '-p', '22', self.target]
             if self.config.get('verbosity', 0) > 0:
                 console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
             # Debug: show raw output
             if self.config.get('verbosity', 0) >= 2 and result.stdout.strip():
                 lines = [l for l in result.stdout.split('\n') if l.strip() and not l.startswith('#')]
@@ -237,7 +237,7 @@ class LinuxRecon:
             cmd = ['showmount', '-e', self.target]
             if self.config.get('verbosity', 0) > 0:
                 console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
             
             if result.returncode == 0:
                 for line in result.stdout.split('\n')[1:]:  # Skip header
@@ -304,7 +304,7 @@ class LinuxRecon:
             cmd = ['nmap', '--script', 'ftp-anon', '-p', str(port), self.target]
             if self.config.get('verbosity', 0) > 0:
                 console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
             
             if 'Anonymous FTP login allowed' in result.stdout:
                 ftp_info['anonymous'] = True
@@ -354,7 +354,7 @@ class LinuxRecon:
             cmd = ['nmap', '--script', 'mysql-info', '-p', str(port), self.target]
             if self.config.get('verbosity', 0) > 0:
                 console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
             
             version_match = re.search(r'Version:\s*(\S+)', result.stdout)
             if version_match:
@@ -373,7 +373,7 @@ class LinuxRecon:
             cmd = ['nmap', '--script', 'pgsql-brute', '-p', str(port), self.target]
             if self.config.get('verbosity', 0) > 0:
                 console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
             
             return pg_info
             
@@ -417,7 +417,7 @@ class LinuxRecon:
             cmd = ['nmap', '--script', 'mongodb-info', '-p', str(port), self.target]
             if self.config.get('verbosity', 0) > 0:
                 console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
             
             if 'mongodb' in result.stdout.lower():
                 mongo_info['no_auth'] = 'authentication' not in result.stdout.lower()

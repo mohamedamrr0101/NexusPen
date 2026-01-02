@@ -150,7 +150,7 @@ class WebRecon:
                 
             result = subprocess.run(
                 cmd,
-                capture_output=True, text=True, timeout=60
+                capture_output=True, text=True, timeout=120
             )
             
             if result.returncode == 0:
@@ -256,7 +256,7 @@ class WebRecon:
                 
             result = subprocess.run(
                 cmd,
-                capture_output=True, text=True, timeout=60
+                capture_output=True, text=True, timeout=120
             )
             
             if result.returncode == 0:

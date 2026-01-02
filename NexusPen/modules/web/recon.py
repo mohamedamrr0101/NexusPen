@@ -108,36 +108,54 @@ class WebRecon:
             'findings': []
         }
         
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console
-        ) as progress:
+        # Determine if we should use spinner or streaming
+        use_streaming = self.config.get('verbosity', 0) >= 2 and self.command_runner
+        
+        if use_streaming:
+            # Run without Progress context to allow streaming output
+            console.print("[dim]Running in streaming mode - live command output enabled[/dim]")
             
-            # Technology detection
-            task = progress.add_task("Detecting technologies...", total=None)
+            console.print("\n[yellow]🔍 Detecting technologies...[/yellow]")
             results['technologies'], results['cms'] = self.detect_technologies()
-            progress.update(task, completed=True)
             
-            # WAF detection
-            task = progress.add_task("Detecting WAF...", total=None)
+            console.print("\n[yellow]🛡️ Detecting WAF...[/yellow]")
             results['waf'] = self.detect_waf()
-            progress.update(task, completed=True)
             
-            # SSL analysis
-            task = progress.add_task("Analyzing SSL/TLS...", total=None)
+            console.print("\n[yellow]🔒 Analyzing SSL/TLS...[/yellow]")
             results['ssl_info'] = self.analyze_ssl()
-            progress.update(task, completed=True)
             
-            # Security headers check
-            task = progress.add_task("Checking security headers...", total=None)
+            console.print("\n[yellow]🔐 Checking security headers...[/yellow]")
             results['headers'], results['security_headers'] = self.check_security_headers()
-            progress.update(task, completed=True)
             
-            # Robots.txt
-            task = progress.add_task("Fetching robots.txt...", total=None)
+            console.print("\n[yellow]🤖 Fetching robots.txt...[/yellow]")
             results['robots_txt'] = self.get_robots_txt()
-            progress.update(task, completed=True)
+        else:
+            # Use Progress spinner for non-verbose mode
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console
+            ) as progress:
+                
+                task = progress.add_task("Detecting technologies...", total=None)
+                results['technologies'], results['cms'] = self.detect_technologies()
+                progress.update(task, completed=True)
+                
+                task = progress.add_task("Detecting WAF...", total=None)
+                results['waf'] = self.detect_waf()
+                progress.update(task, completed=True)
+                
+                task = progress.add_task("Analyzing SSL/TLS...", total=None)
+                results['ssl_info'] = self.analyze_ssl()
+                progress.update(task, completed=True)
+                
+                task = progress.add_task("Checking security headers...", total=None)
+                results['headers'], results['security_headers'] = self.check_security_headers()
+                progress.update(task, completed=True)
+                
+                task = progress.add_task("Fetching robots.txt...", total=None)
+                results['robots_txt'] = self.get_robots_txt()
+                progress.update(task, completed=True)
         
         # Display results
         self._display_results(results)

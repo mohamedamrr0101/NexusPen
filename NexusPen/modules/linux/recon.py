@@ -95,33 +95,51 @@ class LinuxRecon:
             'findings': []
         }
         
-        with Progress(
-            SpinnerColumn(),
-            TextColumn("[progress.description]{task.description}"),
-            console=console
-        ) as progress:
+        # Determine if we should use spinner or streaming
+        use_streaming = self.config.get('verbosity', 0) >= 2 and self.command_runner
+        
+        if use_streaming:
+            # Run without Progress context to allow streaming output
+            console.print("[dim]Running in streaming mode - live command output enabled[/dim]")
             
-            # SSH enumeration
-            task = progress.add_task("Enumerating SSH...", total=None)
+            console.print("\n[yellow]📡 Enumerating SSH...[/yellow]")
             results['ssh_info'] = self.enumerate_ssh()
-            progress.update(task, completed=True)
             
-            # NFS enumeration
-            task = progress.add_task("Checking NFS exports...", total=None)
+            console.print("\n[yellow]📂 Checking NFS exports...[/yellow]")
             results['nfs_exports'] = self.enumerate_nfs()
-            progress.update(task, completed=True)
             
-            # Service enumeration
-            task = progress.add_task("Enumerating services...", total=None)
+            console.print("\n[yellow]🔧 Enumerating services...[/yellow]")
             results['services'] = self.enumerate_services()
-            progress.update(task, completed=True)
             
-            # Vulnerability checks
-            task = progress.add_task("Checking vulnerabilities...", total=None)
+            console.print("\n[yellow]🔍 Checking vulnerabilities...[/yellow]")
             self.check_shellshock()
             self.check_dirty_cow()
             self.check_sudo_vulns()
-            progress.update(task, completed=True)
+        else:
+            # Use Progress spinner for non-verbose mode
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                console=console
+            ) as progress:
+                
+                task = progress.add_task("Enumerating SSH...", total=None)
+                results['ssh_info'] = self.enumerate_ssh()
+                progress.update(task, completed=True)
+                
+                task = progress.add_task("Checking NFS exports...", total=None)
+                results['nfs_exports'] = self.enumerate_nfs()
+                progress.update(task, completed=True)
+                
+                task = progress.add_task("Enumerating services...", total=None)
+                results['services'] = self.enumerate_services()
+                progress.update(task, completed=True)
+                
+                task = progress.add_task("Checking vulnerabilities...", total=None)
+                self.check_shellshock()
+                self.check_dirty_cow()
+                self.check_sudo_vulns()
+                progress.update(task, completed=True)
         
         results['findings'] = [f.__dict__ for f in self.findings]
         self._display_results(results)

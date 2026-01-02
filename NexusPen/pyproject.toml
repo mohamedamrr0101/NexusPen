@@ -1,0 +1,183 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nexuspen"
+version = "1.0.0"
+description = "Professional Penetration Testing Framework"
+readme = "README.md"
+license = {file = "LICENSE"}
+requires-python = ">=3.9"
+authors = [
+    {name = "NexusPen Development Team", email = "nexuspen@example.com"}
+]
+maintainers = [
+    {name = "NexusPen Development Team", email = "nexuspen@example.com"}
+]
+keywords = [
+    "penetration-testing",
+    "security",
+    "vulnerability-scanner",
+    "pentest",
+    "ethical-hacking",
+    "cybersecurity",
+    "web-security",
+    "network-security",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Information Technology",
+    "Intended Audience :: System Administrators",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Security",
+    "Topic :: System :: Networking",
+    "Topic :: System :: Systems Administration",
+]
+
+dependencies = [
+    "python-nmap>=0.7.1",
+    "requests>=2.31.0",
+    "beautifulsoup4>=4.12.0",
+    "lxml>=4.9.0",
+    "dnspython>=2.4.0",
+    "python-whois>=0.8.0",
+    "sqlalchemy>=2.0.0",
+    "rich>=13.0.0",
+    "click>=8.1.0",
+    "colorama>=0.4.6",
+    "tqdm>=4.66.0",
+    "jinja2>=3.1.0",
+    "markdown>=3.5.0",
+    "aiohttp>=3.9.0",
+    "cryptography>=41.0.0",
+    "paramiko>=3.4.0",
+    "scapy>=2.5.0",
+    "impacket>=0.11.0",
+    "netaddr>=0.9.0",
+    "httpx>=0.25.0",
+    "pyyaml>=6.0.0",
+    "python-dotenv>=1.0.0",
+    "validators>=0.22.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "flake8>=6.1.0",
+    "mypy>=1.5.0",
+    "isort>=5.12.0",
+    "pre-commit>=3.5.0",
+]
+docs = [
+    "sphinx>=7.0.0",
+    "sphinx-rtd-theme>=1.3.0",
+    "myst-parser>=2.0.0",
+]
+full = [
+    "weasyprint>=60.0",
+    "pdfkit>=1.0.0",
+    "selenium>=4.15.0",
+    "shodan>=1.30.0",
+    "censys>=2.2.0",
+    "pymetasploit3>=1.0.0",
+]
+
+[project.scripts]
+nexuspen = "nexuspen:main"
+
+[project.urls]
+Homepage = "https://github.com/nexuspen/nexuspen"
+Documentation = "https://github.com/nexuspen/nexuspen/wiki"
+Repository = "https://github.com/nexuspen/nexuspen"
+Issues = "https://github.com/nexuspen/nexuspen/issues"
+Changelog = "https://github.com/nexuspen/nexuspen/blob/main/CHANGELOG.md"
+
+[tool.setuptools]
+packages = ["core", "modules", "modules.web", "modules.windows", "modules.linux", 
+            "modules.ad", "modules.network", "modules.password", "modules.wireless",
+            "modules.exploit", "modules.common", "modules.report"]
+
+[tool.setuptools.package-data]
+"*" = ["*.yaml", "*.json", "*.html", "*.md"]
+
+# Black configuration
+[tool.black]
+line-length = 100
+target-version = ['py39', 'py310', 'py311', 'py312']
+include = '\.pyi?$'
+exclude = '''
+/(
+    \.git
+    | \.hg
+    | \.mypy_cache
+    | \.tox
+    | \.venv
+    | _build
+    | buck-out
+    | build
+    | dist
+)/
+'''
+
+# isort configuration
+[tool.isort]
+profile = "black"
+line_length = 100
+known_first_party = ["core", "modules"]
+skip = [".git", ".venv", "build", "dist"]
+
+# mypy configuration
+[tool.mypy]
+python_version = "3.9"
+warn_return_any = true
+warn_unused_configs = true
+ignore_missing_imports = true
+exclude = [
+    "tests/",
+    "build/",
+    "dist/",
+]
+
+# pytest configuration
+[tool.pytest.ini_options]
+minversion = "7.0"
+addopts = "-ra -q --strict-markers"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "integration: marks tests as integration tests",
+    "network: marks tests that require network access",
+]
+
+# Coverage configuration
+[tool.coverage.run]
+source = ["core", "modules"]
+branch = true
+omit = [
+    "tests/*",
+    "*/test_*",
+]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]

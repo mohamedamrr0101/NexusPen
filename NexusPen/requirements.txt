@@ -1,0 +1,53 @@
+# NexusPen - Penetration Testing Framework Requirements
+# Install with: pip3 install -r requirements.txt
+
+# Core Dependencies
+python-nmap>=0.7.1
+requests>=2.31.0
+beautifulsoup4>=4.12.0
+lxml>=4.9.0
+dnspython>=2.4.0
+python-whois>=0.8.0
+
+# Database & Storage
+sqlalchemy>=2.0.0
+sqlite3-api>=2.0.0
+
+# CLI & UI
+rich>=13.0.0
+click>=8.1.0
+colorama>=0.4.6
+tqdm>=4.66.0
+
+# Reporting
+jinja2>=3.1.0
+weasyprint>=60.0
+markdown>=3.5.0
+pdfkit>=1.0.0
+
+# Async & Concurrency
+aiohttp>=3.9.0
+asyncio>=3.4.3
+
+# Security & Crypto
+cryptography>=41.0.0
+paramiko>=3.4.0
+pymetasploit3>=1.0.0
+
+# Network
+scapy>=2.5.0
+impacket>=0.11.0
+netaddr>=0.9.0
+
+# Web Scanning
+httpx>=0.25.0
+selenium>=4.15.0
+
+# OSINT
+shodan>=1.30.0
+censys>=2.2.0
+
+# Utilities
+pyyaml>=6.0.0
+python-dotenv>=1.0.0
+validators>=0.22.0

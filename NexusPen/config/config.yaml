@@ -1,0 +1,136 @@
+# NexusPen Configuration File
+# ===========================
+
+general:
+  name: "NexusPen"
+  version: "1.0.0"
+  author: "Security Professional"
+  threads: 10
+  timeout: 30
+  verbose: true
+  debug: false
+
+# Tool Paths (Kali Linux defaults)
+tools:
+  nmap: "/usr/bin/nmap"
+  masscan: "/usr/bin/masscan"
+  nikto: "/usr/bin/nikto"
+  nuclei: "/usr/bin/nuclei"
+  gobuster: "/usr/bin/gobuster"
+  dirb: "/usr/bin/dirb"
+  sqlmap: "/usr/bin/sqlmap"
+  hydra: "/usr/bin/hydra"
+  metasploit: "/usr/bin/msfconsole"
+  msfvenom: "/usr/bin/msfvenom"
+  searchsploit: "/usr/bin/searchsploit"
+  enum4linux: "/usr/bin/enum4linux"
+  smbclient: "/usr/bin/smbclient"
+  wfuzz: "/usr/bin/wfuzz"
+  whatweb: "/usr/bin/whatweb"
+  wpscan: "/usr/bin/wpscan"
+  theharvester: "/usr/bin/theHarvester"
+  recon_ng: "/usr/bin/recon-ng"
+  john: "/usr/bin/john"
+  hashcat: "/usr/bin/hashcat"
+
+# Wordlists
+wordlists:
+  directories: "/usr/share/wordlists/dirb/common.txt"
+  passwords: "/usr/share/wordlists/rockyou.txt"
+  usernames: "/usr/share/wordlists/metasploit/unix_users.txt"
+  subdomains: "/usr/share/wordlists/seclists/Discovery/DNS/subdomains-top1million-5000.txt"
+  vhosts: "/usr/share/wordlists/seclists/Discovery/DNS/namelist.txt"
+
+# Scan Profiles
+profiles:
+  stealth:
+    description: "Slow and quiet scanning"
+    nmap_timing: "T1"
+    threads: 2
+    delay: 5
+  
+  normal:
+    description: "Balanced scanning"
+    nmap_timing: "T3"
+    threads: 10
+    delay: 0
+  
+  aggressive:
+    description: "Fast and loud scanning"
+    nmap_timing: "T4"
+    threads: 50
+    delay: 0
+  
+  insane:
+    description: "Maximum speed (noisy)"
+    nmap_timing: "T5"
+    threads: 100
+    delay: 0
+
+# Port Ranges
+ports:
+  quick: "21,22,23,25,53,80,110,111,135,139,143,443,445,993,995,1723,3306,3389,5900,8080"
+  top100: "7,9,13,21-23,25-26,37,53,79-81,88,106,110-111,113,119,135,139,143-144,179,199,389,427,443-445,465,513-515,543-544,548,554,587,631,646,873,990,993,995,1025-1029,1110,1433,1720,1723,1755,1900,2000-2001,2049,2121,2717,3000,3128,3306,3389,3986,4899,5000,5009,5051,5060,5101,5190,5357,5432,5631,5666,5800,5900,6000-6001,6646,7070,8000,8008-8009,8080-8081,8443,8888,9100,9999-10000,32768,49152-49157"
+  full: "1-65535"
+
+# Database
+database:
+  path: "./data/nexuspen.db"
+  backup: true
+
+# Logging
+logging:
+  level: "INFO"
+  file: "./logs/nexuspen.log"
+  max_size: "10MB"
+  backup_count: 5
+
+# Reporting
+reporting:
+  output_dir: "./reports"
+  formats: ["html", "pdf", "json"]
+  company_name: "Security Assessment"
+  logo_path: "./assets/logo.png"
+  include_evidence: true
+  include_remediation: true
+
+# API Keys (set via environment variables)
+api_keys:
+  shodan: "${SHODAN_API_KEY}"
+  censys_id: "${CENSYS_API_ID}"
+  censys_secret: "${CENSYS_API_SECRET}"
+  virustotal: "${VIRUSTOTAL_API_KEY}"
+  securitytrails: "${SECURITYTRAILS_API_KEY}"
+
+# AI Assistant Configuration
+ai:
+  enabled: true
+  provider: "openrouter"
+  api_key: "${OPENROUTER_API_KEY}"  # Get from https://openrouter.ai/keys
+  model: "deepseek/deepseek-r1-0528:free"   # FREE model! Options: deepseek, claude-3, gpt-4
+  temperature: 0.7
+  max_tokens: 4096
+  # Available models:
+  # - deepseek/deepseek-chat (recommended - fast & cheap)
+  # - deepseek/deepseek-coder (for code analysis)
+  # - anthropic/claude-3-haiku (fast)
+  # - anthropic/claude-3.5-sonnet (smart)
+  # - openai/gpt-4-turbo
+  # - mistralai/mixtral-8x7b-instruct
+
+# Exploitation Settings
+exploitation:
+  auto_exploit: false
+  safe_mode: true
+  max_attempts: 3
+  payload_types: ["reverse_tcp", "reverse_https", "meterpreter"]
+  lhost: "0.0.0.0"
+  lport: 4444
+
+# Web Scanning
+web:
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+  follow_redirects: true
+  max_depth: 3
+  excluded_extensions: [".jpg", ".jpeg", ".png", ".gif", ".css", ".js", ".ico"]
+  rate_limit: 10

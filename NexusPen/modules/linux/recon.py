@@ -53,36 +53,54 @@ class LinuxRecon:
         self.tool_manager = self.config.get('tool_manager')
         self.dashboard = None
     
-    def _execute(self, cmd: List[str], timeout: int = 60) -> tuple:
-        """Execute command using CommandRunner if available, else subprocess."""
+    def _run(self, cmd: List[str]) -> tuple:
+        """
+        Execute command directly in the terminal.
+        No timeout - user can press Ctrl+C to skip.
+        Output is captured using tee for parsing.
+        """
         if self.command_runner:
-            result = self.command_runner.execute(cmd, timeout=timeout)
-            return result.return_code == 0 if result.return_code is not None else False, result.stdout
+            result = self.command_runner.execute_terminal(cmd, capture=True)
+            success = result.return_code == 0 if result.return_code is not None else False
+            return success, result.stdout or ""
         else:
-            # Fallback to direct subprocess
-            if self.config.get('verbosity', 0) > 0:
-                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
+            # Fallback to os.system directly
+            import os
+            import shlex
+            import tempfile
+            
+            cmd_str = ' '.join(shlex.quote(c) for c in cmd)
+            console.print(f"\n[bold green]┌─ Running:[/bold green] [yellow]{cmd_str}[/yellow]")
+            console.print(f"[dim]└─ Press Ctrl+C to skip[/dim]\n")
+            
             try:
-                result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
-                return result.returncode == 0, result.stdout
-            except (subprocess.TimeoutExpired, FileNotFoundError):
+                temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt')
+                temp_file.close()
+                full_cmd = f"{cmd_str} 2>&1 | tee {temp_file.name}"
+                
+                return_code = os.system(full_cmd)
+                
+                output = ""
+                try:
+                    with open(temp_file.name, 'r') as f:
+                        output = f.read()
+                    os.unlink(temp_file.name)
+                except:
+                    pass
+                
+                success = (return_code >> 8) == 0
+                if success:
+                    console.print(f"\n[green]✅ Completed[/green]")
+                else:
+                    console.print(f"\n[red]❌ Failed[/red]")
+                return success, output
+                
+            except KeyboardInterrupt:
+                console.print(f"\n[yellow]⏭️ Skipped[/yellow]")
                 return False, ""
-    
-    def _execute_live(self, cmd: List[str]) -> tuple:
-        """Execute with live output directly in the terminal (like typing manually)."""
-        if self.command_runner and self.config.get('verbosity', 0) >= 2:
-            try:
-                # Use raw execution - output goes directly to terminal
-                result = self.command_runner.execute_raw(cmd)
-                # Note: execute_raw doesn't capture stdout, so we return empty string
-                # but the user sees the output directly in their terminal
-                return result.return_code == 0 if result.return_code is not None else False, ""
             except Exception as e:
-                console.print(f"[red]Error in raw execution: {e}[/red]")
-                return self._execute(cmd)
-        else:
-            # Fallback to regular execute
-            return self._execute(cmd)
+                console.print(f"\n[red]❌ Error: {e}[/red]")
+                return False, ""
     
     def run_full_recon(self) -> Dict:
         """Run comprehensive Linux reconnaissance."""
@@ -239,7 +257,7 @@ class LinuxRecon:
         # Check for password authentication using live execution
         try:
             cmd = ['nmap', '--script', 'ssh-auth-methods', '-p', '22', self.target]
-            success, stdout = self._execute_live(cmd)
+            success, stdout = self._run(cmd)
             
             if 'password' in stdout.lower():
                 ssh_info['auth_methods'].append('password')
@@ -330,7 +348,7 @@ class LinuxRecon:
         try:
             # Check anonymous login
             cmd = ['nmap', '--script', 'ftp-anon', '-p', str(port), self.target]
-            success, stdout = self._execute_live(cmd)
+            success, stdout = self._run(cmd)
             
             if 'Anonymous FTP login allowed' in stdout:
                 ftp_info['anonymous'] = True
@@ -466,7 +484,7 @@ class LinuxRecon:
         """Check for Shellshock vulnerability."""
         try:
             cmd = ['nmap', '--script', 'http-shellshock', '-p', '80,443,8080', self.target]
-            success, stdout = self._execute_live(cmd)
+            success, stdout = self._run(cmd)
             
             if 'VULNERABLE' in stdout:
                 self.findings.append(LinuxFinding(

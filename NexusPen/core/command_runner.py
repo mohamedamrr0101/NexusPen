@@ -354,6 +354,90 @@ class CommandRunner:
             self.panel = None
             self._panel_started = False
     
+    def execute_terminal(self, cmd: List[str], capture: bool = True) -> CommandResult:
+        """
+        Execute command directly in the terminal like the user typed it.
+        Uses os.system() for true terminal passthrough.
+        If capture=True, uses tee to also save output for parsing.
+        
+        Args:
+            cmd: Command and arguments as a list
+            capture: If True, also capture output to temp file using tee
+        
+        Returns:
+            CommandResult with status and optionally captured output
+        """
+        import os
+        import shlex
+        import tempfile
+        
+        cmd_str = ' '.join(shlex.quote(c) for c in cmd)
+        
+        result = CommandResult(
+            command=cmd,
+            status=CommandStatus.PENDING,
+            start_time=datetime.now()
+        )
+        
+        # Print command header
+        console.print(f"\n[bold green]┌─ Running:[/bold green] [yellow]{cmd_str}[/yellow]")
+        console.print(f"[dim]└─ Press Ctrl+C to skip[/dim]\n")
+        
+        temp_file = None
+        try:
+            start_time = time.time()
+            
+            if capture:
+                # Use tee to both display AND capture output
+                temp_file = tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.txt')
+                temp_file.close()
+                full_cmd = f"{cmd_str} 2>&1 | tee {temp_file.name}"
+            else:
+                full_cmd = cmd_str
+            
+            # Execute directly in terminal
+            return_code = os.system(full_cmd)
+            
+            duration = time.time() - start_time
+            result.duration = duration
+            result.end_time = datetime.now()
+            result.return_code = return_code >> 8  # os.system returns exit code shifted
+            
+            # Read captured output if available
+            if capture and temp_file:
+                try:
+                    with open(temp_file.name, 'r') as f:
+                        result.stdout = f.read()
+                    os.unlink(temp_file.name)  # Clean up temp file
+                except:
+                    pass
+            
+            if result.return_code == 0:
+                result.status = CommandStatus.SUCCESS
+                console.print(f"\n[green]✅ Completed in {duration:.1f}s[/green]")
+            else:
+                result.status = CommandStatus.FAILED
+                console.print(f"\n[red]❌ Failed (exit code: {result.return_code})[/red]")
+                
+        except KeyboardInterrupt:
+            result.status = CommandStatus.SKIPPED
+            result.end_time = datetime.now()
+            console.print(f"\n[yellow]⏭️ Skipped (Ctrl+C)[/yellow]")
+            # Clean up temp file
+            if temp_file:
+                try:
+                    os.unlink(temp_file.name)
+                except:
+                    pass
+            
+        except Exception as e:
+            result.status = CommandStatus.FAILED
+            result.stderr = str(e)
+            result.end_time = datetime.now()
+            console.print(f"\n[red]❌ Error: {e}[/red]")
+        
+        return result
+    
     def execute(
         self,
         cmd: List[str],

@@ -84,6 +84,14 @@ class WebRecon:
             except (subprocess.TimeoutExpired, FileNotFoundError):
                 return False, ""
     
+    def _execute_live(self, cmd: List[str]) -> tuple:
+        """Execute with live streaming output (no timeout, Ctrl+C to skip)."""
+        if self.command_runner and self.config.get('verbosity', 0) >= 2:
+            result = self.command_runner.execute_streaming(cmd)
+            return result.return_code == 0 if result.return_code is not None else False, result.stdout
+        else:
+            return self._execute(cmd)
+    
     def run_full_recon(self) -> Dict:
         """Run comprehensive web reconnaissance."""
         console.print(f"\n[cyan]🌐 Starting Web Reconnaissance: {self.target}[/cyan]")

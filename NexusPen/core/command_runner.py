@@ -356,6 +356,126 @@ class CommandRunner:
         """
         result = self.execute(cmd, timeout=timeout)
         return result.status == CommandStatus.SUCCESS, result.stdout
+    
+    def execute_streaming(self, cmd: List[str], check_tool: bool = True) -> CommandResult:
+        """
+        Execute command with live streaming output and NO timeout.
+        User can press Ctrl+C to skip to the next command.
+        
+        Args:
+            cmd: Command and arguments as a list
+            check_tool: Whether to check if the tool exists first
+        
+        Returns:
+            CommandResult with execution details
+        """
+        cmd_str = ' '.join(cmd)
+        tool_name = cmd[0]
+        
+        result = CommandResult(
+            command=cmd,
+            status=CommandStatus.PENDING,
+            start_time=datetime.now()
+        )
+        
+        # Print command header
+        console.print()
+        console.print("╔" + "═" * 68 + "╗")
+        console.print(f"║  [bold cyan]🖥️ LIVE TERMINAL[/bold cyan] - [dim]Press Ctrl+C to skip command[/dim]" + " " * 14 + "║")
+        console.print("╠" + "═" * 68 + "╣")
+        console.print(f"│ [bold yellow]$ {cmd_str[:64]}[/bold yellow]" + " " * max(0, 66 - len(cmd_str)) + "│")
+        console.print("╠" + "─" * 68 + "╣")
+        
+        # Check if tool exists
+        if check_tool and self.tool_manager:
+            tool_path = self.tool_manager.check_tool(tool_name)
+            if not tool_path:
+                result.status = CommandStatus.TOOL_NOT_FOUND
+                result.end_time = datetime.now()
+                install_cmd = self.tool_manager.get_install_command(tool_name)
+                console.print(f"│ [yellow]⚠️ Tool not found: {tool_name}[/yellow]" + " " * 30 + "│")
+                if install_cmd:
+                    console.print(f"│ [dim]Install: {install_cmd[:56]}[/dim]" + " " * max(0, 57 - len(install_cmd)) + "│")
+                console.print("╚" + "═" * 68 + "╝")
+                return result
+        
+        # Execute with streaming
+        try:
+            start_time = time.time()
+            stdout_lines = []
+            
+            process = subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1  # Line buffered
+            )
+            
+            # Stream output line by line - NO TIMEOUT
+            try:
+                for line in iter(process.stdout.readline, ''):
+                    line = line.rstrip()
+                    if line:
+                        stdout_lines.append(line)
+                        # Truncate long lines for display
+                        display_line = line[:66] if len(line) > 66 else line
+                        console.print(f"│ [dim]{display_line}[/dim]" + " " * max(0, 67 - len(display_line)) + "│")
+                
+                process.wait()  # Wait for completion - NO TIMEOUT
+                
+            except KeyboardInterrupt:
+                # User pressed Ctrl+C - skip this command
+                process.terminate()
+                try:
+                    process.wait(timeout=2)
+                except:
+                    process.kill()
+                
+                result.status = CommandStatus.SKIPPED
+                result.end_time = datetime.now()
+                result.duration = time.time() - start_time
+                result.stdout = '\n'.join(stdout_lines)
+                
+                console.print("├" + "─" * 68 + "┤")
+                console.print(f"│ [yellow]⏭️  Skipped (Ctrl+C)[/yellow]" + " " * 44 + "│")
+                console.print("╚" + "═" * 68 + "╝")
+                console.print()
+                return result
+            
+            # Command completed normally
+            duration = time.time() - start_time
+            result.duration = duration
+            result.end_time = datetime.now()
+            result.stdout = '\n'.join(stdout_lines)
+            result.return_code = process.returncode
+            
+            if process.returncode == 0:
+                result.status = CommandStatus.SUCCESS
+                console.print("├" + "─" * 68 + "┤")
+                console.print(f"│ [green]✅ Completed in {duration:.1f}s[/green]" + " " * (49 - len(f"{duration:.1f}")) + "│")
+            else:
+                result.status = CommandStatus.FAILED
+                console.print("├" + "─" * 68 + "┤")
+                console.print(f"│ [red]❌ Failed (exit code: {process.returncode})[/red]" + " " * 35 + "│")
+            
+            console.print("╚" + "═" * 68 + "╝")
+            console.print()
+            
+        except FileNotFoundError:
+            result.status = CommandStatus.TOOL_NOT_FOUND
+            result.end_time = datetime.now()
+            console.print(f"│ [yellow]⚠️ Command not found: {tool_name}[/yellow]" + " " * 30 + "│")
+            console.print("╚" + "═" * 68 + "╝")
+            
+        except Exception as e:
+            result.status = CommandStatus.FAILED
+            result.stderr = str(e)
+            result.end_time = datetime.now()
+            console.print(f"│ [red]❌ Error: {str(e)[:55]}[/red]" + " " * max(0, 56 - len(str(e))) + "│")
+            console.print("╚" + "═" * 68 + "╝")
+        
+        return result
 
 
 # Global instance

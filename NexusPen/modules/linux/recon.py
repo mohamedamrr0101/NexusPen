@@ -67,6 +67,16 @@ class LinuxRecon:
             except (subprocess.TimeoutExpired, FileNotFoundError):
                 return False, ""
     
+    def _execute_live(self, cmd: List[str]) -> tuple:
+        """Execute with live streaming output (no timeout, Ctrl+C to skip)."""
+        if self.command_runner and self.config.get('verbosity', 0) >= 2:
+            # Use streaming mode for interactive/verbose
+            result = self.command_runner.execute_streaming(cmd)
+            return result.return_code == 0 if result.return_code is not None else False, result.stdout
+        else:
+            # Fallback to regular execute
+            return self._execute(cmd)
+    
     def run_full_recon(self) -> Dict:
         """Run comprehensive Linux reconnaissance."""
         console.print(f"\n[cyan]🐧 Starting Linux Reconnaissance: {self.target}[/cyan]")
@@ -197,29 +207,19 @@ class LinuxRecon:
         except Exception:
             pass
         
-        # Check for password authentication
+        # Check for password authentication using live execution
         try:
             cmd = ['nmap', '--script', 'ssh-auth-methods', '-p', '22', self.target]
-            if self.config.get('verbosity', 0) > 0:
-                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-            # Debug: show raw output
-            if self.config.get('verbosity', 0) >= 2 and result.stdout.strip():
-                lines = [l for l in result.stdout.split('\n') if l.strip() and not l.startswith('#')]
-                for line in lines[:5]:
-                    console.print(f"[dim]   → {line.strip()[:100]}[/dim]")
+            success, stdout = self._execute_live(cmd)
             
-            if 'password' in result.stdout.lower():
+            if 'password' in stdout.lower():
                 ssh_info['auth_methods'].append('password')
-            if 'publickey' in result.stdout.lower():
+            if 'publickey' in stdout.lower():
                 ssh_info['auth_methods'].append('publickey')
                 
-        except subprocess.TimeoutExpired:
+        except Exception as e:
             if self.config.get('verbosity', 0) > 0:
-                console.print(f"[yellow]⚠ nmap ssh-auth-methods timed out[/yellow]")
-        except FileNotFoundError:
-            if self.config.get('verbosity', 0) > 0:
-                console.print(f"[yellow]⚠ nmap not found[/yellow]")
+                console.print(f"[yellow]⚠ nmap ssh-auth-methods error: {e}[/yellow]")
         
         return ssh_info
     

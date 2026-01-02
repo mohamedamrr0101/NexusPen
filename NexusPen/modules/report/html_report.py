@@ -543,3 +543,64 @@ def generate(session, profile, results: List, output_dir: Path) -> str:
     console.print(f"[green]✅ Report saved to: {report_path}[/green]")
     
     return str(report_path)
+
+
+class HTMLReportGenerator:
+    """HTML Report Generator class."""
+    
+    def __init__(self):
+        self.findings = []
+        self.target = "Unknown"
+        
+    def set_findings(self, findings: List[Dict]):
+        """Set findings for the report."""
+        self.findings = findings
+        
+    def set_target(self, target: str):
+        """Set target information."""
+        self.target = target
+        
+    def generate(self, output_path: str) -> str:
+        """Generate HTML report."""
+        console.print(f"\n[cyan]📄 Generating HTML Report: {output_path}[/cyan]")
+        
+        # Calculate stats
+        severity_counts = {
+            'critical': 0, 'high': 0, 'medium': 0, 'low': 0, 'info': 0
+        }
+        for f in self.findings:
+            sev = f.get('severity', 'info').lower()
+            if sev in severity_counts:
+                severity_counts[sev] += 1
+                
+        # Prepare template data
+        template_data = {
+            'report_date': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+            'target': self.target,
+            'total_findings': len(self.findings),
+            'critical_count': severity_counts['critical'],
+            'high_count': severity_counts['high'],
+            'medium_count': severity_counts['medium'],
+            'low_count': severity_counts['low'],
+            'info_count': severity_counts['info'],
+            'findings': self.findings,
+            # Defaults for template variables
+            'target_type': 'Unknown',
+            'duration': 'N/A',
+            'services': {},
+            'open_ports': []
+        }
+        
+        # Render template
+        template = Template(REPORT_TEMPLATE)
+        html_content = template.render(**template_data)
+        
+        # Write report
+        try:
+            with open(output_path, 'w', encoding='utf-8') as f:
+                f.write(html_content)
+            console.print(f"[green]✅ Report saved to: {output_path}[/green]")
+        except Exception as e:
+            console.print(f"[red]Error saving report: {e}[/red]")
+            
+        return output_path

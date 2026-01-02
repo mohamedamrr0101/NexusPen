@@ -257,7 +257,7 @@ secretsdump.py -cached LOCAL
     
     def extract_wifi_passwords(self) -> str:
         """Extract WiFi passwords."""
-        return '''
+        return r'''
 # List saved WiFi profiles
 netsh wlan show profiles
 

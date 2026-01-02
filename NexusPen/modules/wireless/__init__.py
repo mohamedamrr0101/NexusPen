@@ -13,8 +13,8 @@ Includes:
 # Scanner
 from .scanner import (
     WirelessScanner,
-    AccessPoint,
-    WirelessClient,
+    WirelessNetwork,
+    WirelessFinding,
 )
 
 # WiFi Attacks
@@ -52,7 +52,7 @@ from .tools import (
 
 __all__ = [
     # Scanner
-    'WirelessScanner', 'AccessPoint', 'WirelessClient',
+    'WirelessScanner', 'WirelessNetwork', 'WirelessFinding',
     
     # WiFi Attacks
     'WPAAttacks', 'PMKIDAttack', 'WEPAttacks', 'WPSAttacks',

@@ -35,7 +35,7 @@ from .cms_scanner import (
 # SQL Injection
 from .sqli import (
     SQLiScanner,
-    SQLMapWrapper,
+    SQLiFinding,
 )
 
 # XSS
@@ -46,7 +46,7 @@ from .xss import (
 # LFI/RFI
 from .lfi_rfi import (
     LFIScanner,
-    RFIScanner,
+    LFIFinding,
 )
 
 # Vulnerability Scanner
@@ -112,13 +112,13 @@ __all__ = [
     'CMSScanner', 'CMSFinding',
     
     # SQLi
-    'SQLiScanner', 'SQLMapWrapper',
+    'SQLiScanner', 'SQLiFinding',
     
     # XSS
     'XSSScanner',
     
     # LFI/RFI
-    'LFIScanner', 'RFIScanner',
+    'LFIScanner', 'LFIFinding',
     
     # Vuln Scanner
     'WebVulnScanner', 'WebVulnerability',

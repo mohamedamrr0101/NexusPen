@@ -38,7 +38,7 @@ class LFIScanner:
         '..%2F..%2F..%2Fetc%2Fpasswd',
         '..%252f..%252f..%252fetc%252fpasswd',
         '/etc/passwd',
-        '....\/....\/....\/etc/passwd',
+        '....\\\\....\\\\....\\\\etc/passwd',
         '..%c0%af..%c0%af..%c0%afetc/passwd',
         '..%255c..%255c..%255cetc/passwd',
         '..%5c..%5c..%5cetc/passwd',

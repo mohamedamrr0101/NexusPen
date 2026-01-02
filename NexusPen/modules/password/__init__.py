@@ -12,7 +12,7 @@ Includes:
 """
 
 # Brute forcing
-from .bruteforce import PasswordBruteforcer
+from .bruteforce import PasswordBruteforce
 
 # Hash cracking
 from .cracking import (
@@ -59,7 +59,7 @@ HashCracker = HashcatCracker
 
 __all__ = [
     # Brute force
-    'PasswordBruteforcer',
+    'PasswordBruteforce',
     
     # Cracking
     'HashIdentifier', 'HashcatCracker', 'JohnCracker', 'HashCracker',

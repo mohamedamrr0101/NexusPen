@@ -17,7 +17,7 @@ Includes:
 # Reconnaissance
 from .recon import (
     WindowsRecon,
-    SMBRecon,
+    SMBExploiter,
 )
 
 # Enumeration
@@ -78,7 +78,7 @@ from .credential_access import (
 
 __all__ = [
     # Recon
-    'WindowsRecon', 'SMBRecon',
+    'WindowsRecon', 'SMBExploiter',
     
     # Enumeration
     'WindowsEnumerator', 'WindowsSystemInfo', 'RemoteWindowsEnumerator',

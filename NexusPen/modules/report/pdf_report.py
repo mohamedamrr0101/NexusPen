@@ -195,3 +195,48 @@ def generate_xml(session, profile, results: List, output_dir: Path) -> str:
     
     console.print(f"[green]✅ XML saved to: {xml_path}[/green]")
     return str(xml_path)
+
+
+class PDFReport:
+    """PDF Report Generator class."""
+    
+    def __init__(self, output_path: str = None):
+        self.output_path = output_path
+        self.html_generator = None
+        
+    def generate_from_file(self, html_path: str):
+        """Generate PDF from HTML file."""
+        console.print(f"\n[cyan]📄 Generating PDF Report from {html_path}...[/cyan]")
+        
+        try:
+            from weasyprint import HTML, CSS
+            
+            # Output path
+            if not self.output_path:
+                self.output_path = html_path.replace('.html', '.pdf')
+            
+            # Add print-friendly CSS
+            print_css = CSS(string='''
+                @page {
+                    size: A4;
+                    margin: 2cm;
+                }
+                body {
+                    font-size: 11pt;
+                }
+                .finding-card {
+                    page-break-inside: avoid;
+                }
+            ''')
+            
+            HTML(filename=html_path).write_pdf(self.output_path, stylesheets=[print_css])
+            
+            console.print(f"[green]✅ PDF saved to: {self.output_path}[/green]")
+            return self.output_path
+            
+        except ImportError:
+            console.print("[yellow]WeasyPrint not installed, skipping PDF generation[/yellow]")
+            return ""
+        except Exception as e:
+            console.print(f"[red]PDF generation failed: {e}[/red]")
+            return ""

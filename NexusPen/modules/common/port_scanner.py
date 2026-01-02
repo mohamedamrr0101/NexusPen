@@ -93,6 +93,9 @@ class PortScanner:
         
         cmd.append(self.target)
         
+        if self.config.get('verbosity', 0) > 0:
+            console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
+            
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
             
@@ -121,6 +124,9 @@ class PortScanner:
             '-oJ', '-'
         ]
         
+        if self.config.get('verbosity', 0) > 0:
+            console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
+            
         try:
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
             

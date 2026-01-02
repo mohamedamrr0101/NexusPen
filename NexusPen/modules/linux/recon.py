@@ -108,6 +108,8 @@ class LinuxRecon:
         try:
             # Banner grabbing
             cmd = ['nc', '-w', '3', self.target, '22']
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
             
             if result.stdout:
@@ -129,6 +131,8 @@ class LinuxRecon:
         # SSH audit (optional tool)
         try:
             cmd = ['ssh-audit', '-j', self.target]
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
             
             if result.returncode == 0:
@@ -163,6 +167,8 @@ class LinuxRecon:
         # Check for password authentication
         try:
             cmd = ['nmap', '--script', 'ssh-auth-methods', '-p', '22', self.target]
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             
             if 'password' in result.stdout.lower():
@@ -181,6 +187,8 @@ class LinuxRecon:
         
         try:
             cmd = ['showmount', '-e', self.target]
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             
             if result.returncode == 0:
@@ -240,9 +248,10 @@ class LinuxRecon:
         
         try:
             # Check anonymous login
-            cmd = ['ftp', '-n', self.target]
             # Using nmap instead for reliability
             cmd = ['nmap', '--script', 'ftp-anon', '-p', str(port), self.target]
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             
             if 'Anonymous FTP login allowed' in result.stdout:
@@ -266,6 +275,8 @@ class LinuxRecon:
         
         try:
             cmd = ['nmap', '--script', 'smtp-open-relay', '-p', str(port), self.target]
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
             
             if 'Server is an open relay' in result.stdout:
@@ -289,6 +300,8 @@ class LinuxRecon:
         
         try:
             cmd = ['nmap', '--script', 'mysql-info', '-p', str(port), self.target]
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             
             version_match = re.search(r'Version:\s*(\S+)', result.stdout)
@@ -306,6 +319,8 @@ class LinuxRecon:
         
         try:
             cmd = ['nmap', '--script', 'pgsql-brute', '-p', str(port), self.target]
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             
             return pg_info
@@ -319,6 +334,8 @@ class LinuxRecon:
         
         try:
             cmd = ['redis-cli', '-h', self.target, '-p', str(port), 'INFO']
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
             
             if result.returncode == 0 and 'redis_version' in result.stdout:
@@ -346,6 +363,8 @@ class LinuxRecon:
         
         try:
             cmd = ['nmap', '--script', 'mongodb-info', '-p', str(port), self.target]
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             
             if 'mongodb' in result.stdout.lower():
@@ -369,6 +388,8 @@ class LinuxRecon:
         """Check for Shellshock vulnerability."""
         try:
             cmd = ['nmap', '--script', 'http-shellshock', '-p', '80,443,8080', self.target]
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
             
             if 'VULNERABLE' in result.stdout:
@@ -461,9 +482,9 @@ class LinuxPrivEsc:
 
 
 # Module entry point
-def run(target: str, profile, results: list):
+def run(target: str, profile, results: list, config: Dict = None):
     """Main entry point for Linux recon module."""
-    recon = LinuxRecon(target)
+    recon = LinuxRecon(target, config)
     linux_results = recon.run_full_recon()
     results.append({
         'module': 'linux.recon',

@@ -309,9 +309,25 @@ def interactive_mode():
         if not target:
             console.print("[red]Target is required.[/red]")
             continue
+
+        # Verbosity selection
+        console.print("\n[bold yellow]Select Verbosity Level:[/bold yellow]")
+        console.print("  [1] Standard (Status updates only)")
+        console.print("  [2] Verbose (Show executed commands)")
+        console.print("  [3] Debug (Show full output and specialized debug info)")
         
+        v_choice = input("\n[?] Enter verbosity [default: 2]: ").strip()
+        verbosity = 2  # Default to verbose as requested by user ("show me the work")
+        
+        if v_choice == "1":
+            verbosity = 0
+        elif v_choice == "3":
+            verbosity = 2
+        elif v_choice == "2":
+            verbosity = 1
+            
         # Initialize engine and run selected phase
-        engine = NexusPenEngine(target=target)
+        engine = NexusPenEngine(target=target, verbosity=verbosity)
         
         if phase_id == "full":
             engine.run_full_assessment()

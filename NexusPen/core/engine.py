@@ -391,25 +391,25 @@ class NexusPenEngine:
         """Windows-specific reconnaissance."""
         console.print("\n[yellow]🪟 Running Windows Reconnaissance[/yellow]")
         from modules.windows import recon as win_recon
-        win_recon.run(self.target, self.profile, self.results)
+        win_recon.run(self.target, self.profile, self.results, config={'verbosity': self.verbosity})
     
     def _run_linux_recon(self):
         """Linux-specific reconnaissance."""
         console.print("\n[yellow]🐧 Running Linux Reconnaissance[/yellow]")
         from modules.linux import recon as linux_recon
-        linux_recon.run(self.target, self.profile, self.results)
+        linux_recon.run(self.target, self.profile, self.results, config={'verbosity': self.verbosity})
     
     def _run_ad_recon(self):
         """Active Directory reconnaissance."""
         console.print("\n[yellow]🏢 Running Active Directory Reconnaissance[/yellow]")
         from modules.ad import recon as ad_recon
-        ad_recon.run(self.target, self.profile, self.results)
+        ad_recon.run(self.target, self.profile, self.results, config={'verbosity': self.verbosity})
     
     def _run_web_recon(self):
         """Web application reconnaissance."""
         console.print("\n[yellow]🌐 Running Web Reconnaissance[/yellow]")
         from modules.web import recon as web_recon
-        web_recon.run(self.target, self.profile, self.results)
+        web_recon.run(self.target, self.profile, self.results, config={'verbosity': self.verbosity})
     
     def _run_windows_enum(self):
         """Windows enumeration."""

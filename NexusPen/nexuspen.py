@@ -14,6 +14,7 @@ import argparse
 import sys
 import os
 from pathlib import Path
+from dotenv import load_dotenv, set_key, unset_key, find_dotenv
 
 # Add the project root to Python path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -266,6 +267,46 @@ def check_required_tools():
     return all_available
 
 
+def manage_api_key() -> str:
+    """Manage OpenRouter API Key (Load/Save/Delete)."""
+    env_file = find_dotenv()
+    if not env_file:
+        env_file = ".env"
+        Path(env_file).touch()
+    
+    load_dotenv(env_file)
+    stored_key = os.getenv("OPENROUTER_API_KEY")
+    
+    if stored_key:
+        console.print(f"\n[green]🔑 Found saved API Key: {stored_key[:8]}...{stored_key[-4:]}[/green]")
+        console.print("[1] Use saved key")
+        console.print("[2] Delete saved key and enter new one")
+        console.print("[3] Enter new key (don't save)")
+        
+        choice = input("\n[?] Choice [1]: ").strip() or "1"
+        
+        if choice == "1":
+            return stored_key
+        elif choice == "2":
+            unset_key(env_file, "OPENROUTER_API_KEY")
+            console.print("[yellow]🗑️  Key deleted.[/yellow]")
+        elif choice == "3":
+            pass # Just fall through to prompt
+            
+    # Prompt for new key
+    console.print("\n[bold yellow]🤖 Enable AI Analysis (via OpenRouter)?[/bold yellow]")
+    if input("[?] (y/n): ").lower().startswith('y'):
+        api_key = input("[?] Enter OpenRouter API Key: ").strip()
+        if api_key:
+            # Ask to save
+            if input("[?] Save key for future use? (y/n): ").lower().startswith('y'):
+                set_key(env_file, "OPENROUTER_API_KEY", api_key)
+                console.print("[green]💾 Key saved to .env[/green]")
+            return api_key
+            
+    return None
+
+
 def interactive_mode():
     """Launch interactive mode."""
     console.print("\n[bold cyan]═══════════════════════════════════════════════════════════════[/bold cyan]")
@@ -288,13 +329,10 @@ def interactive_mode():
     # Initialize AI Analyzer
     ai_analyzer = AIAnalyzer()
     
-    # Prompt for API key if not set but user wants AI
-    if not ai_analyzer.enabled:
-        console.print("\n[bold yellow]🤖 Enable DeepSeek AI Analysis?[/bold yellow]")
-        if input("[?] (y/n): ").lower().startswith('y'):
-            api_key = input("[?] Enter DeepSeek API Key: ").strip()
-            if api_key:
-                ai_analyzer = AIAnalyzer(api_key=api_key)
+    # Manage API Key (Load/Save/Prompt)
+    api_key = manage_api_key()
+    if api_key:
+        ai_analyzer = AIAnalyzer(api_key=api_key)
 
     while True:
         console.print("\n[bold yellow]Select Phase:[/bold yellow]")

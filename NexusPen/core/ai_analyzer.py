@@ -14,7 +14,7 @@ console = Console()
 
 class AIAnalyzer:
     def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or os.getenv("DEEPSEEK_API_KEY")
+        self.api_key = api_key or os.getenv("OPENROUTER_API_KEY")
         self.client = None
         self.enabled = False
         
@@ -29,12 +29,16 @@ class AIAnalyzer:
         try:
             self.client = OpenAI(
                 api_key=self.api_key,
-                base_url="https://api.deepseek.com"
+                base_url="https://openrouter.ai/api/v1",
+                default_headers={
+                    "HTTP-Referer": "https://github.com/mohamedamrr0101/NexusPen",
+                    "X-Title": "NexusPen",
+                }
             )
             self.enabled = True
-            console.print("[green]🧠 DeepSeek AI Analyzer Initialized[/green]")
+            console.print("[green]🧠 OpenRouter (DeepSeek) Initialized[/green]")
         except Exception as e:
-            console.print(f"[red]❌ Failed to initialize DeepSeek AI: {e}[/red]")
+            console.print(f"[red]❌ Failed to initialize OpenRouter: {e}[/red]")
 
     def summarize_phase(self, phase_name: str, command_history: List[Dict], findings: List[Dict]) -> None:
         if not self.enabled or not self.client:
@@ -72,7 +76,7 @@ Provide a concise, professional summary of this phase.
 
         try:
             response = self.client.chat.completions.create(
-                model="deepseek-chat",
+                model="deepseek/deepseek-chat",
                 messages=[
                     {"role": "system", "content": "You are an elite penetration tester providing concise, actionable tactical analysis."},
                     {"role": "user", "content": prompt}

@@ -203,6 +203,11 @@ class LinuxRecon:
             if self.config.get('verbosity', 0) > 0:
                 console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+            # Debug: show raw output
+            if self.config.get('verbosity', 0) >= 2 and result.stdout.strip():
+                lines = [l for l in result.stdout.split('\n') if l.strip() and not l.startswith('#')]
+                for line in lines[:5]:
+                    console.print(f"[dim]   → {line.strip()[:100]}[/dim]")
             
             if 'password' in result.stdout.lower():
                 ssh_info['auth_methods'].append('password')

@@ -156,6 +156,10 @@ class WebRecon:
             if result.returncode == 0:
                 output = result.stdout.lower()
                 
+                # Debug: show raw output
+                if self.config.get('verbosity', 0) >= 2 and result.stdout.strip():
+                    console.print(f"[dim]   → {result.stdout.strip()[:200]}[/dim]")
+                
                 # Extract technologies
                 tech_patterns = {
                     'apache': 'Apache',
@@ -257,6 +261,10 @@ class WebRecon:
             
             if result.returncode == 0:
                 output = result.stdout
+                
+                # Debug: show raw output
+                if self.config.get('verbosity', 0) >= 2 and result.stdout.strip():
+                    console.print(f"[dim]   → {result.stdout.strip()[:200]}[/dim]")
                 
                 # Parse output for WAF name
                 waf_match = re.search(r'is behind (.+)', output)

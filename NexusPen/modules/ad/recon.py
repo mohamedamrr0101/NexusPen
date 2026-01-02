@@ -42,9 +42,10 @@ class ADFinding:
 class ADRecon:
     """Active Directory reconnaissance."""
     
-    def __init__(self, target: str, domain: str = None, config: Dict = None):
+    def __init__(self, target: str, domain: str = None, profile=None, config: Dict = None):
         self.target = target
         self.domain = domain
+        self.profile = profile
         self.config = config or {}
         self.findings: List[ADFinding] = []
         self.users: List[Dict] = []
@@ -158,6 +159,12 @@ class ADRecon:
             'domain_admins': []
         }
         
+        # Check if LDAP ports are open (389, 636, 3268, 3269)
+        if self.profile:
+            ldap_ports = {389, 636, 3268, 3269}
+            if not any(port in self.profile.open_ports for port in ldap_ports):
+                return results
+        
         try:
             # Use ldapdomaindump if available
             cmd = ['ldapdomaindump', self.target, '-u', '', '-p', '', '--no-json']
@@ -214,6 +221,12 @@ class ADRecon:
     def find_spn_accounts(self) -> List[Dict]:
         """Find accounts with SPNs for Kerberoasting."""
         spn_accounts = []
+        
+        # Check if Kerberos (88) or LDAP (389) is open
+        if self.profile:
+            krb_ports = {88, 389, 636}
+            if not any(port in self.profile.open_ports for port in krb_ports):
+                return spn_accounts
         
         try:
             # Use GetUserSPNs.py from Impacket
@@ -523,7 +536,7 @@ def run(target: str, profile, results: list, config: Dict = None):
     if hasattr(profile, 'hostname'):
         domain = profile.hostname
     
-    recon = ADRecon(target, domain, config)
+    recon = ADRecon(target, domain, profile, config)
     ad_results = recon.run_full_recon()
     results.append({
         'module': 'ad.recon',

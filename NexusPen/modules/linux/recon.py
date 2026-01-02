@@ -40,8 +40,9 @@ class LinuxFinding:
 class LinuxRecon:
     """Linux system reconnaissance."""
     
-    def __init__(self, target: str, config: Dict = None):
+    def __init__(self, target: str, profile=None, config: Dict = None):
         self.target = target
+        self.profile = profile
         self.config = config or {}
         self.findings: List[LinuxFinding] = []
         self.services: Dict = {}
@@ -104,6 +105,10 @@ class LinuxRecon:
             'weak_kex': [],
             'vulnerable': False
         }
+        
+        # Check if SSH port is open in profile (if available)
+        if self.profile and 22 not in self.profile.open_ports:
+            return ssh_info
         
         try:
             # Banner grabbing
@@ -185,6 +190,12 @@ class LinuxRecon:
         """Enumerate NFS exports."""
         exports = []
         
+        # Check if NFS ports are open (111, 2049)
+        if self.profile:
+            nfs_ports = {111, 2049}
+            if not any(port in self.profile.open_ports for port in nfs_ports):
+                return exports
+        
         try:
             cmd = ['showmount', '-e', self.target]
             if self.config.get('verbosity', 0) > 0:
@@ -234,6 +245,10 @@ class LinuxRecon:
         
         for port, service_name, check_func in service_checks:
             try:
+                # Skip if we know the port is closed
+                if self.profile and port not in self.profile.open_ports:
+                    continue
+                    
                 result = check_func(port)
                 if result:
                     services[service_name] = result
@@ -484,7 +499,7 @@ class LinuxPrivEsc:
 # Module entry point
 def run(target: str, profile, results: list, config: Dict = None):
     """Main entry point for Linux recon module."""
-    recon = LinuxRecon(target, config)
+    recon = LinuxRecon(target, profile, config)
     linux_results = recon.run_full_recon()
     results.append({
         'module': 'linux.recon',

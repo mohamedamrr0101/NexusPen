@@ -40,8 +40,9 @@ class WindowsFinding:
 class WindowsRecon:
     """Windows system reconnaissance."""
     
-    def __init__(self, target: str, config: Dict = None):
+    def __init__(self, target: str, profile=None, config: Dict = None):
         self.target = target
+        self.profile = profile
         self.config = config or {}
         self.findings: List[WindowsFinding] = []
         self.shares: List[Dict] = []
@@ -105,6 +106,21 @@ class WindowsRecon:
             'domain': None,
             'os_version': None
         }
+        
+    def enumerate_smb(self) -> Dict:
+        """Enumerate SMB shares and information."""
+        results = {
+            'shares': [],
+            'hostname': None,
+            'domain': None,
+            'os_version': None
+        }
+        
+        # Check if SMB ports are open (445 or 139)
+        if self.profile:
+            smb_ports = {445, 139}
+            if not any(port in self.profile.open_ports for port in smb_ports):
+                return results
         
         # Method 1: enum4linux
         try:
@@ -230,6 +246,13 @@ class WindowsRecon:
             'password_policy': {}
         }
         
+        # Check if RPC/SMB ports are open
+        if self.profile:
+            # RPC usually needs 135 or SMB (445/139)
+            rpc_ports = {135, 445, 139}
+            if not any(port in self.profile.open_ports for port in rpc_ports):
+                return results
+                
         try:
             # Enumerate groups
             cmd = ['rpcclient', '-U', '', '-N', self.target, '-c', 'enumdomgroups']
@@ -444,7 +467,7 @@ class WindowsPrivEsc:
 # Module entry point
 def run(target: str, profile, results: list, config: Dict = None):
     """Main entry point for Windows recon module."""
-    recon = WindowsRecon(target, config)
+    recon = WindowsRecon(target, profile, config)
     windows_results = recon.run_full_recon()
     results.append({
         'module': 'windows.recon',

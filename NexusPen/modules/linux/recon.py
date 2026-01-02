@@ -186,73 +186,51 @@ class LinuxRecon:
         if self.profile and 22 not in self.profile.open_ports:
             return ssh_info
         
-        try:
-            # Banner grabbing with longer timeout
-            cmd = ['nc', '-w', '10', self.target, '22']
-            if self.config.get('verbosity', 0) > 0:
-                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=20)
+        # Banner grabbing
+        cmd = ['nc', '-w', '10', self.target, '22']
+        success, output = self._run(cmd)
+        
+        if success and output:
+            ssh_info['version'] = output.strip()
             
-            if result.stdout:
-                ssh_info['version'] = result.stdout.strip()
-                
-                # Check for old SSH versions
-                if 'SSH-1' in result.stdout:
-                    self.findings.append(LinuxFinding(
-                        severity='high',
-                        title='SSH Protocol Version 1 Enabled',
-                        description='SSH server supports insecure protocol version 1',
-                        host=self.target,
-                        remediation='Disable SSH protocol version 1'
-                    ))
-                    
-        except subprocess.TimeoutExpired:
-            if self.config.get('verbosity', 0) > 0:
-                console.print(f"[yellow]⚠ nc timed out[/yellow]")
-        except FileNotFoundError:
-            if self.config.get('verbosity', 0) > 0:
-                console.print(f"[yellow]⚠ nc not found[/yellow]")
+            # Check for old SSH versions
+            if 'SSH-1' in output:
+                self.findings.append(LinuxFinding(
+                    severity='high',
+                    title='SSH Protocol Version 1 Enabled',
+                    description='SSH server supports insecure protocol version 1',
+                    host=self.target,
+                    remediation='Disable SSH protocol version 1'
+                ))
         
         # SSH audit (optional tool)
-        try:
-            cmd = ['ssh-audit', '-j', self.target]
-            if self.config.get('verbosity', 0) > 0:
-                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-            
-            if result.returncode == 0:
-                try:
-                    data = json.loads(result.stdout)
-                    
-                    # Check for weak ciphers
-                    for cipher in data.get('enc', []):
-                        if cipher.get('fail'):
-                            ssh_info['weak_ciphers'].append(cipher.get('name'))
-                            
-                    # Check for weak key exchange
-                    for kex in data.get('kex', []):
-                        if kex.get('fail'):
-                            ssh_info['weak_kex'].append(kex.get('name'))
-                    
-                    if ssh_info['weak_ciphers']:
-                        self.findings.append(LinuxFinding(
-                            severity='medium',
-                            title='Weak SSH Ciphers',
-                            description=f"Weak ciphers: {', '.join(ssh_info['weak_ciphers'][:3])}",
-                            host=self.target,
-                            remediation='Disable weak cryptographic algorithms in sshd_config'
-                        ))
-                except json.JSONDecodeError:
-                    pass
-                    
-        except subprocess.TimeoutExpired:
-            if self.config.get('verbosity', 0) > 0:
-                console.print(f"[yellow]⚠ ssh-audit timed out[/yellow]")
-        except FileNotFoundError:
-            if self.config.get('verbosity', 0) > 0:
-                console.print(f"[yellow]⚠ ssh-audit not installed (pip install ssh-audit)[/yellow]")
-        except Exception:
-            pass
+        cmd = ['ssh-audit', '-j', self.target]
+        success, output = self._run(cmd)
+        
+        if success and output:
+            try:
+                data = json.loads(output)
+                
+                # Check for weak ciphers
+                for cipher in data.get('enc', []):
+                    if cipher.get('fail'):
+                        ssh_info['weak_ciphers'].append(cipher.get('name'))
+                             
+                # Check for weak key exchange
+                for kex in data.get('kex', []):
+                    if kex.get('fail'):
+                        ssh_info['weak_kex'].append(kex.get('name'))
+                
+                if ssh_info['weak_ciphers']:
+                    self.findings.append(LinuxFinding(
+                        severity='medium',
+                        title='Weak SSH Ciphers',
+                        description=f"Weak ciphers: {', '.join(ssh_info['weak_ciphers'][:3])}",
+                        host=self.target,
+                        remediation='Disable weak cryptographic algorithms in sshd_config'
+                    ))
+            except json.JSONDecodeError:
+                pass
         
         # Check for password authentication using live execution
         try:
@@ -280,37 +258,31 @@ class LinuxRecon:
             if not any(port in self.profile.open_ports for port in nfs_ports):
                 return exports
         
-        try:
-            cmd = ['showmount', '-e', self.target]
-            if self.config.get('verbosity', 0) > 0:
-                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-            
-            if result.returncode == 0:
-                for line in result.stdout.split('\n')[1:]:  # Skip header
-                    if line.strip():
-                        parts = line.split()
-                        if len(parts) >= 2:
-                            export_path = parts[0]
-                            allowed_hosts = parts[1]
-                            
-                            exports.append({
-                                'path': export_path,
-                                'hosts': allowed_hosts
-                            })
-                            
-                            # Check for world-readable exports
-                            if '*' in allowed_hosts or '0.0.0.0' in allowed_hosts:
-                                self.findings.append(LinuxFinding(
-                                    severity='high',
-                                    title=f'World-Readable NFS Export: {export_path}',
-                                    description='NFS share is accessible to any host',
-                                    host=self.target,
-                                    remediation='Restrict NFS access to specific hosts'
-                                ))
-                                
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            pass
+        cmd = ['showmount', '-e', self.target]
+        success, output = self._run(cmd)
+        
+        if success and output:
+            for line in output.split('\n')[1:]:  # Skip header
+                if line.strip():
+                    parts = line.split()
+                    if len(parts) >= 2:
+                        export_path = parts[0]
+                        allowed_hosts = parts[1]
+                        
+                        exports.append({
+                            'path': export_path,
+                            'hosts': allowed_hosts
+                        })
+                        
+                        # Check for world-readable exports
+                        if '*' in allowed_hosts or '0.0.0.0' in allowed_hosts:
+                            self.findings.append(LinuxFinding(
+                                severity='high',
+                                title=f'World-Readable NFS Export: {export_path}',
+                                description='NFS share is accessible to any host',
+                                host=self.target,
+                                remediation='Restrict NFS access to specific hosts'
+                            ))
         
         return exports
     
@@ -369,116 +341,89 @@ class LinuxRecon:
         """Check SMTP service."""
         smtp_info = {'open_relay': False, 'vrfy': False}
         
-        try:
-            cmd = ['nmap', '--script', 'smtp-open-relay', '-p', str(port), self.target]
-            if self.config.get('verbosity', 0) > 0:
-                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+        cmd = ['nmap', '--script', 'smtp-open-relay', '-p', str(port), self.target]
+        success, output = self._run(cmd)
+        
+        if 'Server is an open relay' in output:
+            smtp_info['open_relay'] = True
+            self.findings.append(LinuxFinding(
+                severity='high',
+                title='SMTP Open Relay',
+                description='Mail server is configured as an open relay',
+                host=self.target,
+                remediation='Configure SMTP authentication and relay restrictions'
+            ))
             
-            if 'Server is an open relay' in result.stdout:
-                smtp_info['open_relay'] = True
-                self.findings.append(LinuxFinding(
-                    severity='high',
-                    title='SMTP Open Relay',
-                    description='Mail server is configured as an open relay',
-                    host=self.target,
-                    remediation='Configure SMTP authentication and relay restrictions'
-                ))
-                
-            return smtp_info
-            
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            return None
+        return smtp_info
     
     def _check_mysql(self, port: int = 3306) -> Optional[Dict]:
         """Check MySQL service."""
         mysql_info = {'version': None, 'auth_bypass': False}
         
-        try:
-            cmd = ['nmap', '--script', 'mysql-info', '-p', str(port), self.target]
-            if self.config.get('verbosity', 0) > 0:
-                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        cmd = ['nmap', '--script', 'mysql-info', '-p', str(port), self.target]
+        success, output = self._run(cmd)
+        
+        version_match = re.search(r'Version:\s*(\S+)', output)
+        if version_match:
+            mysql_info['version'] = version_match.group(1)
             
-            version_match = re.search(r'Version:\s*(\S+)', result.stdout)
-            if version_match:
-                mysql_info['version'] = version_match.group(1)
-                
-            return mysql_info
-            
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            return None
+        return mysql_info
     
     def _check_postgresql(self, port: int = 5432) -> Optional[Dict]:
         """Check PostgreSQL service."""
         pg_info = {'version': None}
         
-        try:
-            cmd = ['nmap', '--script', 'pgsql-brute', '-p', str(port), self.target]
-            if self.config.get('verbosity', 0) > 0:
-                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
-            
-            return pg_info
-            
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            return None
+        cmd = ['nmap', '--script', 'pgsql-brute', '-p', str(port), self.target]
+        success, output = self._run(cmd)
+        
+        return pg_info
     
     def _check_redis(self, port: int = 6379) -> Optional[Dict]:
         """Check Redis service."""
         redis_info = {'version': None, 'no_auth': False}
         
-        try:
-            cmd = ['redis-cli', '-h', self.target, '-p', str(port), 'INFO']
-            if self.config.get('verbosity', 0) > 0:
-                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
-            
-            if result.returncode == 0 and 'redis_version' in result.stdout:
-                redis_info['no_auth'] = True
-                version_match = re.search(r'redis_version:(\S+)', result.stdout)
-                if version_match:
-                    redis_info['version'] = version_match.group(1)
-                    
-                self.findings.append(LinuxFinding(
-                    severity='critical',
-                    title='Redis No Authentication',
-                    description='Redis server is accessible without authentication',
-                    host=self.target,
-                    remediation='Enable Redis authentication with requirepass directive'
-                ))
+        cmd = ['redis-cli', '-h', self.target, '-p', str(port), 'INFO']
+        success, output = self._run(cmd)
+        
+        if success and 'redis_version' in output:
+            redis_info['no_auth'] = True
+            version_match = re.search(r'redis_version:(\S+)', output)
+            if version_match:
+                redis_info['version'] = version_match.group(1)
+                
+            self.findings.append(LinuxFinding(
+                severity='critical',
+                title='Redis No Authentication',
+                description='Redis server is accessible without authentication',
+                host=self.target,
+                remediation='Enable Redis authentication with requirepass directive'
+            ))
                 
             return redis_info
             
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            return None
+            
+            return redis_info
     
     def _check_mongodb(self, port: int = 27017) -> Optional[Dict]:
         """Check MongoDB service."""
         mongo_info = {'version': None, 'no_auth': False}
         
-        try:
-            cmd = ['nmap', '--script', 'mongodb-info', '-p', str(port), self.target]
-            if self.config.get('verbosity', 0) > 0:
-                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
+        cmd = ['nmap', '--script', 'mongodb-info', '-p', str(port), self.target]
+        success, output = self._run(cmd)
+        
+        if 'mongodb' in output.lower():
+            mongo_info['no_auth'] = 'authentication' not in output.lower()
             
-            if 'mongodb' in result.stdout.lower():
-                mongo_info['no_auth'] = 'authentication' not in result.stdout.lower()
+            if mongo_info['no_auth']:
+                self.findings.append(LinuxFinding(
+                    severity='critical',
+                    title='MongoDB No Authentication',
+                    description='MongoDB server is accessible without authentication',
+                    host=self.target,
+                    remediation='Enable MongoDB authentication'
+                ))
                 
-                if mongo_info['no_auth']:
-                    self.findings.append(LinuxFinding(
-                        severity='critical',
-                        title='MongoDB No Authentication',
-                        description='MongoDB server is accessible without authentication',
-                        host=self.target,
-                        remediation='Enable MongoDB authentication'
-                    ))
-                    
-            return mongo_info
-            
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            return None
+        return mongo_info
     
     def check_shellshock(self):
         """Check for Shellshock vulnerability."""

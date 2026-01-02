@@ -436,6 +436,9 @@ class CommandRunner:
             result.end_time = datetime.now()
             console.print(f"\n[red]❌ Error: {e}[/red]")
         
+        # Add to history
+        self.history.append(asdict(result))
+        
         return result
     
     def execute(

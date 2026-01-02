@@ -27,6 +27,7 @@ from rich import print as rprint
 from core.engine import NexusPenEngine
 from core.logger import setup_logger
 from core.utils import print_banner, validate_target, check_root
+from core.ai_analyzer import AIAnalyzer
 
 console = Console()
 
@@ -284,6 +285,17 @@ def interactive_mode():
         "9": ("Exit", "exit")
     }
     
+    # Initialize AI Analyzer
+    ai_analyzer = AIAnalyzer()
+    
+    # Prompt for API key if not set but user wants AI
+    if not ai_analyzer.enabled:
+        console.print("\n[bold yellow]🤖 Enable DeepSeek AI Analysis?[/bold yellow]")
+        if input("[?] (y/n): ").lower().startswith('y'):
+            api_key = input("[?] Enter DeepSeek API Key: ").strip()
+            if api_key:
+                ai_analyzer = AIAnalyzer(api_key=api_key)
+
     while True:
         console.print("\n[bold yellow]Select Phase:[/bold yellow]")
         for key, (name, _) in phases.items():
@@ -329,12 +341,29 @@ def interactive_mode():
         # Initialize engine and run selected phase
         engine = NexusPenEngine(target=target, verbosity=verbosity)
         
+        # Track command history start for this phase
+        history_start_idx = len(engine.command_runner.history) if engine.command_runner else 0
+        
         if phase_id == "full":
             engine.run_full_assessment()
         elif phase_id == "report":
             engine.generate_report()
         else:
             engine.run_phase(phase_id)
+            
+        # AI Analysis
+        if ai_analyzer.enabled and engine.command_runner:
+            # Get only new commands from this phase
+            new_commands = engine.command_runner.history[history_start_idx:]
+            
+            # Get findings
+            findings = engine.db.get_findings(engine.session.session_id)
+            
+            if new_commands:
+                ai_analyzer.summarize_phase(phase_name, new_commands, findings)
+            else:
+                if verbosity > 0:
+                    console.print("[dim]No commands executed to analyze.[/dim]")
 
 
 def main():

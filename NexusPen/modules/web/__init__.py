@@ -28,10 +28,8 @@ from .recon import (
 
 # CMS Scanning
 from .cms_scanner import (
-    CMSDetector,
-    WordPressScanner,
-    JoomlaScanner,
-    DrupalScanner,
+    CMSScanner,
+    CMSFinding,
 )
 
 # SQL Injection
@@ -111,7 +109,7 @@ __all__ = [
     'WebRecon', 'WebScanner', 'WebFinding',
     
     # CMS
-    'CMSDetector', 'WordPressScanner', 'JoomlaScanner', 'DrupalScanner',
+    'CMSScanner', 'CMSFinding',
     
     # SQLi
     'SQLiScanner', 'SQLMapWrapper',
@@ -181,8 +179,8 @@ def run_full_assessment(target_url: str, depth: str = 'standard') -> dict:
     # 2. CMS Detection
     console.print("\n[cyan]━━━ Phase 2: CMS Detection ━━━[/cyan]")
     try:
-        cms = CMSDetector(target_url)
-        cms_result = cms.detect()
+        cms = CMSScanner(target_url)
+        cms_result = cms.detect_cms()
         if cms_result:
             results['info'].append({'phase': 'cms', 'type': cms_result})
     except Exception as e:
@@ -247,7 +245,7 @@ OWASP_TOP_10 = {
         'WebVulnScanner.check_sensitive_files'
     ],
     'A06:2021 - Vulnerable Components': [
-        'CMSScanner', 'WordPressScanner'
+        'CMSScanner'
     ],
     'A07:2021 - Authentication Failures': [
         'JWTAnalyzer', 'SessionAnalyzer', 'CookieAnalyzer'

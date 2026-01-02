@@ -339,6 +339,7 @@ class CommandRunner:
         self.use_live_panel = live_panel and verbosity > 0
         self.panel: Optional[LiveCommandPanel] = None
         self._panel_started = False
+        self.history: List[Dict] = []
     
     def start_panel(self):
         """Start the live panel if enabled."""

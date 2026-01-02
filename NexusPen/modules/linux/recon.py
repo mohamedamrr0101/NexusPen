@@ -47,6 +47,25 @@ class LinuxRecon:
         self.findings: List[LinuxFinding] = []
         self.services: Dict = {}
         self.users: List[str] = []
+        
+        # Get command runner if available
+        self.command_runner = self.config.get('command_runner')
+        self.tool_manager = self.config.get('tool_manager')
+    
+    def _execute(self, cmd: List[str], timeout: int = 60) -> tuple:
+        """Execute command using CommandRunner if available, else subprocess."""
+        if self.command_runner:
+            result = self.command_runner.execute(cmd, timeout=timeout)
+            return result.return_code == 0 if result.return_code is not None else False, result.stdout
+        else:
+            # Fallback to direct subprocess
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
+            try:
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+                return result.returncode == 0, result.stdout
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                return False, ""
     
     def run_full_recon(self) -> Dict:
         """Run comprehensive Linux reconnaissance."""
@@ -130,8 +149,12 @@ class LinuxRecon:
                         remediation='Disable SSH protocol version 1'
                     ))
                     
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            pass
+        except subprocess.TimeoutExpired:
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[yellow]⚠ nc timed out[/yellow]")
+        except FileNotFoundError:
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[yellow]⚠ nc not found[/yellow]")
         
         # SSH audit (optional tool)
         try:
@@ -165,8 +188,13 @@ class LinuxRecon:
                 except json.JSONDecodeError:
                     pass
                     
-        except (subprocess.TimeoutExpired, FileNotFoundError, Exception):
-            # ssh-audit not installed - skip
+        except subprocess.TimeoutExpired:
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[yellow]⚠ ssh-audit timed out[/yellow]")
+        except FileNotFoundError:
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[yellow]⚠ ssh-audit not installed (pip install ssh-audit)[/yellow]")
+        except Exception:
             pass
         
         # Check for password authentication
@@ -181,8 +209,12 @@ class LinuxRecon:
             if 'publickey' in result.stdout.lower():
                 ssh_info['auth_methods'].append('publickey')
                 
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            pass
+        except subprocess.TimeoutExpired:
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[yellow]⚠ nmap ssh-auth-methods timed out[/yellow]")
+        except FileNotFoundError:
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[yellow]⚠ nmap not found[/yellow]")
         
         return ssh_info
     

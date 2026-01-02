@@ -64,6 +64,25 @@ class WebRecon:
             'User-Agent': self.config.get('user_agent', 
                 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36')
         })
+        
+        # Get command runner if available
+        self.command_runner = self.config.get('command_runner')
+        self.tool_manager = self.config.get('tool_manager')
+    
+    def _execute(self, cmd: List[str], timeout: int = 60) -> tuple:
+        """Execute command using CommandRunner if available, else subprocess."""
+        if self.command_runner:
+            result = self.command_runner.execute(cmd, timeout=timeout)
+            return result.return_code == 0 if result.return_code is not None else False, result.stdout
+        else:
+            # Fallback to direct subprocess
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
+            try:
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
+                return result.returncode == 0, result.stdout
+            except (subprocess.TimeoutExpired, FileNotFoundError):
+                return False, ""
     
     def run_full_recon(self) -> Dict:
         """Run comprehensive web reconnaissance."""
@@ -181,8 +200,12 @@ class WebRecon:
                         cms = name
                         break
                         
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            pass
+        except subprocess.TimeoutExpired:
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[yellow]⚠ whatweb timed out[/yellow]")
+        except FileNotFoundError:
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[yellow]⚠ whatweb not installed (apt install whatweb)[/yellow]")
         
         # Method 2: Manual header analysis
         try:
@@ -240,8 +263,12 @@ class WebRecon:
                 if waf_match:
                     return waf_match.group(1).strip()
                 
-        except (subprocess.TimeoutExpired, FileNotFoundError):
-            pass
+        except subprocess.TimeoutExpired:
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[yellow]⚠ wafw00f timed out[/yellow]")
+        except FileNotFoundError:
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[yellow]⚠ wafw00f not installed (pip install wafw00f)[/yellow]")
         
         # Manual WAF detection
         try:

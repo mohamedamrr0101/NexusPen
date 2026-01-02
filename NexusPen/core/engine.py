@@ -22,6 +22,8 @@ from rich.live import Live
 from .detector import TargetDetector, TargetProfile, TargetType
 from .database import Database
 from .logger import get_logger
+from .tool_manager import ToolManager, get_tool_manager
+from .command_runner import CommandRunner, get_command_runner
 
 console = Console()
 logger = get_logger(__name__)
@@ -135,6 +137,14 @@ class NexusPenEngine:
         
         # Load configuration
         self.config = self._load_config(config_path)
+        
+        # Initialize smart tool management
+        self.tool_manager = ToolManager(auto_install=False, verbosity=verbosity)
+        self.command_runner = CommandRunner(
+            verbosity=verbosity,
+            tool_manager=self.tool_manager,
+            live_panel=(verbosity > 0)
+        )
         
         logger.info(f"NexusPen Engine initialized for target: {target}")
     
@@ -391,25 +401,41 @@ class NexusPenEngine:
         """Windows-specific reconnaissance."""
         console.print("\n[yellow]🪟 Running Windows Reconnaissance[/yellow]")
         from modules.windows import recon as win_recon
-        win_recon.run(self.target, self.profile, self.results, config={'verbosity': self.verbosity})
+        win_recon.run(self.target, self.profile, self.results, config={
+            'verbosity': self.verbosity,
+            'command_runner': self.command_runner,
+            'tool_manager': self.tool_manager
+        })
     
     def _run_linux_recon(self):
         """Linux-specific reconnaissance."""
         console.print("\n[yellow]🐧 Running Linux Reconnaissance[/yellow]")
         from modules.linux import recon as linux_recon
-        linux_recon.run(self.target, self.profile, self.results, config={'verbosity': self.verbosity})
+        linux_recon.run(self.target, self.profile, self.results, config={
+            'verbosity': self.verbosity,
+            'command_runner': self.command_runner,
+            'tool_manager': self.tool_manager
+        })
     
     def _run_ad_recon(self):
         """Active Directory reconnaissance."""
         console.print("\n[yellow]🏢 Running Active Directory Reconnaissance[/yellow]")
         from modules.ad import recon as ad_recon
-        ad_recon.run(self.target, self.profile, self.results, config={'verbosity': self.verbosity})
+        ad_recon.run(self.target, self.profile, self.results, config={
+            'verbosity': self.verbosity,
+            'command_runner': self.command_runner,
+            'tool_manager': self.tool_manager
+        })
     
     def _run_web_recon(self):
         """Web application reconnaissance."""
         console.print("\n[yellow]🌐 Running Web Reconnaissance[/yellow]")
         from modules.web import recon as web_recon
-        web_recon.run(self.target, self.profile, self.results, config={'verbosity': self.verbosity})
+        web_recon.run(self.target, self.profile, self.results, config={
+            'verbosity': self.verbosity,
+            'command_runner': self.command_runner,
+            'tool_manager': self.tool_manager
+        })
     
     def _run_windows_enum(self):
         """Windows enumeration."""

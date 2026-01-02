@@ -69,19 +69,16 @@ class LinuxRecon:
                 return False, ""
     
     def _execute_live(self, cmd: List[str]) -> tuple:
-        """Execute with live streaming output (no timeout, Ctrl+C to skip)."""
+        """Execute with live output directly in the terminal (like typing manually)."""
         if self.command_runner and self.config.get('verbosity', 0) >= 2:
             try:
-                if self.dashboard:
-                    # Use TUIDashboard if available
-                    result = self.dashboard.execute_tui(cmd, self.command_runner)
-                    return result.return_code == 0 if result.return_code is not None else False, result.stdout or ""
-                else:
-                    # Use streaming mode for real-time output
-                    result = self.command_runner.execute_streaming(cmd)
-                    return result.return_code == 0 if result.return_code is not None else False, result.stdout or ""
+                # Use raw execution - output goes directly to terminal
+                result = self.command_runner.execute_raw(cmd)
+                # Note: execute_raw doesn't capture stdout, so we return empty string
+                # but the user sees the output directly in their terminal
+                return result.return_code == 0 if result.return_code is not None else False, ""
             except Exception as e:
-                console.print(f"[red]Error in streaming execution: {e}[/red]")
+                console.print(f"[red]Error in raw execution: {e}[/red]")
                 return self._execute(cmd)
         else:
             # Fallback to regular execute
@@ -105,51 +102,26 @@ class LinuxRecon:
         use_streaming = self.config.get('verbosity', 0) >= 2 and self.command_runner
         
         if use_streaming:
-            # Try to use TUI Dashboard
-            try:
-                from core.command_runner import TUIDashboard
-                
-                self.dashboard = TUIDashboard()
-                self.dashboard.start()
-                
-                try:
-                    self.dashboard.add_output(f"🐧 Starting Linux Reconnaissance: {self.target}")
-                    
-                    self.dashboard.add_output("📡 Enumerating SSH...")
-                    results['ssh_info'] = self.enumerate_ssh()
-                    
-                    self.dashboard.add_output("📂 Checking NFS exports...")
-                    results['nfs_exports'] = self.enumerate_nfs()
-                    
-                    self.dashboard.add_output("🔧 Enumerating services...")
-                    results['services'] = self.enumerate_services()
-                    
-                    self.dashboard.add_output("🔍 Checking vulnerabilities...")
-                    self.check_shellshock()
-                    self.check_dirty_cow()
-                    self.check_sudo_vulns()
-                    
-                finally:
-                    self.dashboard.stop()
-                    self.dashboard = None
-                    
-            except ImportError:
-                # Fallback to simple streaming if import fails
-                console.print("[dim]Running in streaming mode - live command output enabled[/dim]")
-                
-                console.print("\n[yellow]📡 Enumerating SSH...[/yellow]")
-                results['ssh_info'] = self.enumerate_ssh()
-                
-                console.print("\n[yellow]📂 Checking NFS exports...[/yellow]")
-                results['nfs_exports'] = self.enumerate_nfs()
-                
-                console.print("\n[yellow]🔧 Enumerating services...[/yellow]")
-                results['services'] = self.enumerate_services()
-                
-                console.print("\n[yellow]🔍 Checking vulnerabilities...[/yellow]")
-                self.check_shellshock()
-                self.check_dirty_cow()
-                self.check_sudo_vulns()
+            # Raw terminal mode - commands run directly in terminal
+            console.print("\n[bold cyan]═══════════════════════════════════════════════════════════════[/bold cyan]")
+            console.print("[bold cyan]     🐧 LINUX RECONNAISSANCE - Raw Terminal Mode[/bold cyan]")
+            console.print("[bold cyan]═══════════════════════════════════════════════════════════════[/bold cyan]")
+            console.print("[dim]Commands will execute directly in your terminal.[/dim]")
+            console.print("[dim]Press Ctrl+C to skip any command.[/dim]\n")
+            
+            console.print("\n[bold yellow]📡 Enumerating SSH...[/bold yellow]")
+            results['ssh_info'] = self.enumerate_ssh()
+            
+            console.print("\n[bold yellow]📂 Checking NFS exports...[/bold yellow]")
+            results['nfs_exports'] = self.enumerate_nfs()
+            
+            console.print("\n[bold yellow]🔧 Enumerating services...[/bold yellow]")
+            results['services'] = self.enumerate_services()
+            
+            console.print("\n[bold yellow]🔍 Checking vulnerabilities...[/bold yellow]")
+            self.check_shellshock()
+            self.check_dirty_cow()
+            self.check_sudo_vulns()
         else:
             # Use Progress spinner for non-verbose mode
             with Progress(

@@ -86,19 +86,16 @@ class WebRecon:
                 return False, ""
     
     def _execute_live(self, cmd: List[str]) -> tuple:
-        """Execute with live streaming output (no timeout, Ctrl+C to skip)."""
+        """Execute with live output directly in the terminal (like typing manually)."""
         if self.command_runner and self.config.get('verbosity', 0) >= 2:
             try:
-                if self.dashboard:
-                    # Use TUIDashboard if available
-                    result = self.dashboard.execute_tui(cmd, self.command_runner)
-                    return result.return_code == 0 if result.return_code is not None else False, result.stdout or ""
-                else:
-                    # Use streaming mode for real-time output
-                    result = self.command_runner.execute_streaming(cmd)
-                    return result.return_code == 0 if result.return_code is not None else False, result.stdout or ""
+                # Use raw execution - output goes directly to terminal
+                result = self.command_runner.execute_raw(cmd)
+                # Note: execute_raw doesn't capture stdout, so we return empty string
+                # but the user sees the output directly in their terminal
+                return result.return_code == 0 if result.return_code is not None else False, ""
             except Exception as e:
-                console.print(f"[red]Error in streaming execution: {e}[/red]")
+                console.print(f"[red]Error in raw execution: {e}[/red]")
                 return self._execute(cmd)
         else:
             return self._execute(cmd)
@@ -123,53 +120,27 @@ class WebRecon:
         use_streaming = self.config.get('verbosity', 0) >= 2 and self.command_runner
         
         if use_streaming:
-            # Try to use TUI Dashboard
-            try:
-                from core.command_runner import TUIDashboard
-                
-                self.dashboard = TUIDashboard()
-                self.dashboard.start()
-                
-                try:
-                    self.dashboard.add_output(f"🌐 Starting Web Reconnaissance: {self.target}")
-                    
-                    self.dashboard.add_output("🔍 Detecting technologies...")
-                    results['technologies'], results['cms'] = self.detect_technologies()
-                    
-                    self.dashboard.add_output("🛡️ Detecting WAF...")
-                    results['waf'] = self.detect_waf()
-                    
-                    self.dashboard.add_output("🔒 Analyzing SSL/TLS...")
-                    results['ssl_info'] = self.analyze_ssl()
-                    
-                    self.dashboard.add_output("🔐 Checking security headers...")
-                    results['headers'], results['security_headers'] = self.check_security_headers()
-                    
-                    self.dashboard.add_output("🤖 Fetching robots.txt...")
-                    results['robots_txt'] = self.get_robots_txt()
-                
-                finally:
-                    self.dashboard.stop()
-                    self.dashboard = None
-                    
-            except ImportError:
-                # Fallback to simple streaming
-                console.print("[dim]Running in streaming mode - live command output enabled[/dim]")
-                
-                console.print("\n[yellow]🔍 Detecting technologies...[/yellow]")
-                results['technologies'], results['cms'] = self.detect_technologies()
-                
-                console.print("\n[yellow]🛡️ Detecting WAF...[/yellow]")
-                results['waf'] = self.detect_waf()
-                
-                console.print("\n[yellow]🔒 Analyzing SSL/TLS...[/yellow]")
-                results['ssl_info'] = self.analyze_ssl()
-                
-                console.print("\n[yellow]🔐 Checking security headers...[/yellow]")
-                results['headers'], results['security_headers'] = self.check_security_headers()
-                
-                console.print("\n[yellow]🤖 Fetching robots.txt...[/yellow]")
-                results['robots_txt'] = self.get_robots_txt()
+            # Raw terminal mode - commands run directly in terminal
+            console.print("\n[bold cyan]═══════════════════════════════════════════════════════════════[/bold cyan]")
+            console.print("[bold cyan]     🌐 WEB RECONNAISSANCE - Raw Terminal Mode[/bold cyan]")
+            console.print("[bold cyan]═══════════════════════════════════════════════════════════════[/bold cyan]")
+            console.print("[dim]Commands will execute directly in your terminal.[/dim]")
+            console.print("[dim]Press Ctrl+C to skip any command.[/dim]\n")
+            
+            console.print("\n[bold yellow]🔍 Detecting technologies...[/bold yellow]")
+            results['technologies'], results['cms'] = self.detect_technologies()
+            
+            console.print("\n[bold yellow]🛡️ Detecting WAF...[/bold yellow]")
+            results['waf'] = self.detect_waf()
+            
+            console.print("\n[bold yellow]🔒 Analyzing SSL/TLS...[/bold yellow]")
+            results['ssl_info'] = self.analyze_ssl()
+            
+            console.print("\n[bold yellow]🔐 Checking security headers...[/bold yellow]")
+            results['headers'], results['security_headers'] = self.check_security_headers()
+            
+            console.print("\n[bold yellow]🤖 Fetching robots.txt...[/bold yellow]")
+            results['robots_txt'] = self.get_robots_txt()
         else:
             # Use Progress spinner for non-verbose mode
             with Progress(
@@ -212,22 +183,10 @@ class WebRecon:
         try:
             # Method 1: WhatWeb
             cmd = ['whatweb', '--color=never', '-q', '-a', '3', self.target]
-            if self.config.get('verbosity', 0) > 0:
-                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
-                
-            result = subprocess.run(
-                cmd,
-                capture_output=True, text=True, timeout=120
-            )
+            success, output = self._execute_live(cmd)
             
-            if result.returncode == 0:
-                output = result.stdout.lower()
-                
-                # Debug: show raw output
-                if self.config.get('verbosity', 0) >= 2 and result.stdout.strip():
-                    console.print(f"[dim]   → {result.stdout.strip()[:200]}[/dim]")
-                
-                # Extract technologies
+            if success and output:
+                output_lower = output.lower()
                 tech_patterns = {
                     'apache': 'Apache',
                     'nginx': 'Nginx',
@@ -250,7 +209,7 @@ class WebRecon:
                 }
                 
                 for key, name in tech_patterns.items():
-                    if key in output:
+                    if key in output_lower:
                         technologies.append(name)
                 
                 # CMS detection
@@ -267,7 +226,7 @@ class WebRecon:
                 }
                 
                 for key, name in cms_patterns.items():
-                    if key in output:
+                    if key in output_lower:
                         cms = name
                         break
                         

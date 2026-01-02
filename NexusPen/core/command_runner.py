@@ -497,7 +497,6 @@ class CommandRunner:
                 self.panel.update_status(panel_index, CommandStatus.FAILED)
             elif self.verbosity > 0:
                 console.print(f"[red]Error: {e}[/red]")
-        
         return result
     
     def execute_simple(self, cmd: List[str], timeout: int = 60) -> Tuple[bool, str]:
@@ -507,6 +506,64 @@ class CommandRunner:
         """
         result = self.execute(cmd, timeout=timeout)
         return result.status == CommandStatus.SUCCESS, result.stdout
+    
+    def execute_raw(self, cmd: List[str]) -> CommandResult:
+        """
+        Execute command directly in the terminal like the user typed it.
+        Output goes directly to the terminal (not captured by Python).
+        Uses os.system() for true terminal passthrough.
+        
+        Args:
+            cmd: Command and arguments as a list
+        
+        Returns:
+            CommandResult with basic status info (no stdout captured)
+        """
+        import os
+        import shlex
+        
+        cmd_str = ' '.join(shlex.quote(c) for c in cmd)
+        
+        result = CommandResult(
+            command=cmd,
+            status=CommandStatus.PENDING,
+            start_time=datetime.now()
+        )
+        
+        # Print command header
+        console.print(f"\n[bold green]┌─ Running:[/bold green] [yellow]{cmd_str}[/yellow]")
+        console.print(f"[dim]└─ Press Ctrl+C to skip[/dim]\n")
+        
+        try:
+            start_time = time.time()
+            
+            # Execute directly in terminal - output goes to screen, not captured
+            return_code = os.system(cmd_str)
+            
+            duration = time.time() - start_time
+            result.duration = duration
+            result.end_time = datetime.now()
+            result.return_code = return_code >> 8  # os.system returns exit code shifted
+            
+            if result.return_code == 0:
+                result.status = CommandStatus.SUCCESS
+                console.print(f"\n[green]✅ Completed in {duration:.1f}s[/green]")
+            else:
+                result.status = CommandStatus.FAILED
+                console.print(f"\n[red]❌ Failed (exit code: {result.return_code})[/red]")
+                
+        except KeyboardInterrupt:
+            result.status = CommandStatus.SKIPPED
+            result.end_time = datetime.now()
+            console.print(f"\n[yellow]⏭️ Skipped (Ctrl+C)[/yellow]")
+            
+        except Exception as e:
+            result.status = CommandStatus.FAILED
+            result.stderr = str(e)
+            result.end_time = datetime.now()
+            console.print(f"\n[red]❌ Error: {e}[/red]")
+        
+        return result
     
     def execute_streaming(self, cmd: List[str], check_tool: bool = True) -> CommandResult:
         """

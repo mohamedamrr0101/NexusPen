@@ -51,6 +51,7 @@ class LinuxRecon:
         # Get command runner if available
         self.command_runner = self.config.get('command_runner')
         self.tool_manager = self.config.get('tool_manager')
+        self.dashboard = None
     
     def _execute(self, cmd: List[str], timeout: int = 60) -> tuple:
         """Execute command using CommandRunner if available, else subprocess."""
@@ -71,9 +72,14 @@ class LinuxRecon:
         """Execute with live streaming output (no timeout, Ctrl+C to skip)."""
         if self.command_runner and self.config.get('verbosity', 0) >= 2:
             try:
-                # Use streaming mode for real-time output
-                result = self.command_runner.execute_streaming(cmd)
-                return result.return_code == 0 if result.return_code is not None else False, result.stdout or ""
+                if self.dashboard:
+                    # Use TUIDashboard if available
+                    result = self.dashboard.execute_tui(cmd, self.command_runner)
+                    return result.return_code == 0 if result.return_code is not None else False, result.stdout or ""
+                else:
+                    # Use streaming mode for real-time output
+                    result = self.command_runner.execute_streaming(cmd)
+                    return result.return_code == 0 if result.return_code is not None else False, result.stdout or ""
             except Exception as e:
                 console.print(f"[red]Error in streaming execution: {e}[/red]")
                 return self._execute(cmd)
@@ -99,22 +105,51 @@ class LinuxRecon:
         use_streaming = self.config.get('verbosity', 0) >= 2 and self.command_runner
         
         if use_streaming:
-            # Run without Progress context to allow streaming output
-            console.print("[dim]Running in streaming mode - live command output enabled[/dim]")
-            
-            console.print("\n[yellow]📡 Enumerating SSH...[/yellow]")
-            results['ssh_info'] = self.enumerate_ssh()
-            
-            console.print("\n[yellow]📂 Checking NFS exports...[/yellow]")
-            results['nfs_exports'] = self.enumerate_nfs()
-            
-            console.print("\n[yellow]🔧 Enumerating services...[/yellow]")
-            results['services'] = self.enumerate_services()
-            
-            console.print("\n[yellow]🔍 Checking vulnerabilities...[/yellow]")
-            self.check_shellshock()
-            self.check_dirty_cow()
-            self.check_sudo_vulns()
+            # Try to use TUI Dashboard
+            try:
+                from core.command_runner import TUIDashboard
+                
+                self.dashboard = TUIDashboard()
+                self.dashboard.start()
+                
+                try:
+                    self.dashboard.add_output(f"🐧 Starting Linux Reconnaissance: {self.target}")
+                    
+                    self.dashboard.add_output("📡 Enumerating SSH...")
+                    results['ssh_info'] = self.enumerate_ssh()
+                    
+                    self.dashboard.add_output("📂 Checking NFS exports...")
+                    results['nfs_exports'] = self.enumerate_nfs()
+                    
+                    self.dashboard.add_output("🔧 Enumerating services...")
+                    results['services'] = self.enumerate_services()
+                    
+                    self.dashboard.add_output("🔍 Checking vulnerabilities...")
+                    self.check_shellshock()
+                    self.check_dirty_cow()
+                    self.check_sudo_vulns()
+                    
+                finally:
+                    self.dashboard.stop()
+                    self.dashboard = None
+                    
+            except ImportError:
+                # Fallback to simple streaming if import fails
+                console.print("[dim]Running in streaming mode - live command output enabled[/dim]")
+                
+                console.print("\n[yellow]📡 Enumerating SSH...[/yellow]")
+                results['ssh_info'] = self.enumerate_ssh()
+                
+                console.print("\n[yellow]📂 Checking NFS exports...[/yellow]")
+                results['nfs_exports'] = self.enumerate_nfs()
+                
+                console.print("\n[yellow]🔧 Enumerating services...[/yellow]")
+                results['services'] = self.enumerate_services()
+                
+                console.print("\n[yellow]🔍 Checking vulnerabilities...[/yellow]")
+                self.check_shellshock()
+                self.check_dirty_cow()
+                self.check_sudo_vulns()
         else:
             # Use Progress spinner for non-verbose mode
             with Progress(

@@ -617,31 +617,115 @@ class CommandRunner:
             result.status = CommandStatus.TOOL_NOT_FOUND
             result.end_time = datetime.now()
             console.print(f"│ [yellow]⚠️ Command not found: {tool_name}[/yellow]" + " " * 30 + "│")
-            console.print("╚" + "═" * 68 + "╝")
+from rich.layout import Layout
+from rich.align import Align
+
+class TUIDashboard:
+    """
+    Full-screen TUI Dashboard for NexusPen.
+    Mimics airodump-ng/top interface.
+    """
+    def __init__(self):
+        self.layout = Layout()
+        self.layout.split(
+            Layout(name="header", size=3),
+            Layout(name="main", ratio=1),
+            Layout(name="footer", size=3)
+        )
+        self.layout["main"].split_row(
+            Layout(name="status", ratio=1),
+            Layout(name="output", ratio=2)
+        )
+        
+        self.start_time = None
+        self.command_start_time = None
+        self.total_commands = 0
+        self.success_count = 0
+        self.fail_count = 0
+        self.current_cmd = "Idle"
+        self.output_log = []
+        self.max_log = 50
+        self.live = None
+        
+    def start(self):
+        self.start_time = time.time()
+        self.live = Live(
+            self.layout,
+            refresh_per_second=10,
+            screen=True  # Full screen mode
+        )
+        self.live.start()
+        
+    def stop(self):
+        if self.live:
+            self.live.stop()
             
-        except Exception as e:
-            result.status = CommandStatus.FAILED
-            result.stderr = str(e)
-            result.end_time = datetime.now()
-            console.print(f"│ [red]❌ Error: {str(e)[:55]}[/red]" + " " * max(0, 56 - len(str(e))) + "│")
-            console.print("╚" + "═" * 68 + "╝")
+    def update_command(self, cmd: str):
+        self.current_cmd = cmd
+        self.command_start_time = time.time()
+        self.total_commands += 1
+        self.output_log = [] # Clear log for new command
+        self._refresh()
         
-        return result
-    
-    def execute_with_panel(self, cmd: List[str], panel: 'AircrackStylePanel') -> CommandResult:
-        """
-        Execute command with an AircrackStylePanel for live updates.
-        No timeout - user can press Ctrl+C to skip.
+    def add_output(self, line: str):
+        self.output_log.append(line)
+        if len(self.output_log) > self.max_log:
+            self.output_log.pop(0)
+        self._refresh()
         
-        Args:
-            cmd: Command and arguments as a list
-            panel: AircrackStylePanel instance for live display
+    def complete_command(self, success: bool):
+        if success:
+            self.success_count += 1
+        else:
+            self.fail_count += 1
+        self._refresh()
         
-        Returns:
-            CommandResult with execution details
-        """
-        cmd_str = ' '.join(cmd)
-        tool_name = cmd[0]
+    def _refresh(self):
+        if not self.live:
+            return
+            
+        elapsed = time.time() - self.start_time if self.start_time else 0
+        elapsed_str = f"{int(elapsed // 3600):02d}:{int((elapsed % 3600) // 60):02d}:{int(elapsed % 60):02d}"
+        
+        # Header
+        header_text = Text()
+        header_text.append(" NexusPen v1.0 ", style="bold black on green")
+        header_text.append(f" Time: {datetime.now().strftime('%H:%M:%S')} ", style="bold white on blue")
+        header_text.append(f" Elapsed: {elapsed_str} ", style="bold white on black")
+        self.layout["header"].update(Panel(Align.center(header_text), style="green"))
+        
+        # Status Panel
+        status_table = Table(box=None, expand=True)
+        status_table.add_column("Metric", style="cyan")
+        status_table.add_column("Value", style="white")
+        status_table.add_row("Total Commands", str(self.total_commands))
+        status_table.add_row("Successful", f"[green]{self.success_count}[/green]")
+        status_table.add_row("Failed", f"[red]{self.fail_count}[/red]")
+        
+        cmd_duration = 0
+        if self.command_start_time:
+             cmd_duration = time.time() - self.command_start_time
+             
+        status_content = Group(
+            Panel(status_table, title="Session Stats"),
+            Panel(f"[bold yellow]{self.current_cmd}[/bold yellow]\n\nDuration: {cmd_duration:.1f}s", title="Current Command", border_style="yellow")
+        )
+        self.layout["status"].update(Panel(status_content, title="Status"))
+        
+        # Output Panel
+        log_text = Text()
+        for line in self.output_log:
+            log_text.append(line + "\n")
+            
+        self.layout["output"].update(Panel(log_text, title="Console Output", border_style="white"))
+        
+        # Footer
+        self.layout["footer"].update(Panel(Align.center("[bold yellow]Press Ctrl+C to Skip Command[/bold yellow] | [bold red]Ctrl+Z to Exit[/bold red]"), style="blue"))
+
+
+    def execute_tui(self, cmd: List[str], runner: 'CommandRunner') -> CommandResult:
+        """Execute command using this TUI dashboard."""
+        self.update_command(' '.join(cmd))
         
         result = CommandResult(
             command=cmd,
@@ -649,23 +733,6 @@ class CommandRunner:
             start_time=datetime.now()
         )
         
-        # Set command in panel
-        panel.set_command(cmd_str)
-        
-        # Check if tool exists
-        if self.tool_manager:
-            tool_path = self.tool_manager.check_tool(tool_name)
-            if not tool_path:
-                result.status = CommandStatus.TOOL_NOT_FOUND
-                result.end_time = datetime.now()
-                panel.add_output(f"⚠️ Tool not found: {tool_name}")
-                install_cmd = self.tool_manager.get_install_command(tool_name)
-                if install_cmd:
-                    panel.add_output(f"Install with: {install_cmd}")
-                panel.complete(success=False)
-                return result
-        
-        # Execute with streaming
         try:
             start_time = time.time()
             stdout_lines = []
@@ -678,60 +745,45 @@ class CommandRunner:
                 bufsize=1
             )
             
-            # Stream output - NO TIMEOUT
             try:
                 for line in iter(process.stdout.readline, ''):
                     line = line.rstrip()
                     if line:
                         stdout_lines.append(line)
-                        panel.add_output(line)
+                        self.add_output(line)
                 
                 process.wait()
                 
             except KeyboardInterrupt:
-                # User pressed Ctrl+C
                 process.terminate()
-                try:
-                    process.wait(timeout=2)
-                except:
+                try: 
+                    process.wait(timeout=1) 
+                except: 
                     process.kill()
-                
+                    
                 result.status = CommandStatus.SKIPPED
-                result.end_time = datetime.now()
-                result.duration = time.time() - start_time
-                result.stdout = '\n'.join(stdout_lines)
-                panel.skip()
-                return result
-            
-            # Completed
+                self.add_output("[yellow]Command skipped by user[/yellow]")
+                
             duration = time.time() - start_time
             result.duration = duration
-            result.end_time = datetime.now()
             result.stdout = '\n'.join(stdout_lines)
             result.return_code = process.returncode
             
-            if process.returncode == 0:
-                result.status = CommandStatus.SUCCESS
-                panel.complete(success=True)
-            else:
-                result.status = CommandStatus.FAILED
-                panel.complete(success=False)
-            
-        except FileNotFoundError:
-            result.status = CommandStatus.TOOL_NOT_FOUND
-            result.end_time = datetime.now()
-            panel.add_output(f"❌ Command not found: {tool_name}")
-            panel.complete(success=False)
-            
+            if result.status != CommandStatus.SKIPPED:
+                if process.returncode == 0:
+                    result.status = CommandStatus.SUCCESS
+                    self.complete_command(True)
+                else:
+                    result.status = CommandStatus.FAILED
+                    self.complete_command(False)
+                    
         except Exception as e:
             result.status = CommandStatus.FAILED
             result.stderr = str(e)
-            result.end_time = datetime.now()
-            panel.add_output(f"❌ Error: {str(e)}")
-            panel.complete(success=False)
-        
+            self.add_output(f"[red]Error: {e}[/red]")
+            self.complete_command(False)
+            
         return result
-
 
 # Global instance
 _command_runner: Optional[CommandRunner] = None

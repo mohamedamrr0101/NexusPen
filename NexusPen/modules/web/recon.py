@@ -68,6 +68,7 @@ class WebRecon:
         # Get command runner if available
         self.command_runner = self.config.get('command_runner')
         self.tool_manager = self.config.get('tool_manager')
+        self.dashboard = None
     
     def _execute(self, cmd: List[str], timeout: int = 60) -> tuple:
         """Execute command using CommandRunner if available, else subprocess."""
@@ -87,8 +88,18 @@ class WebRecon:
     def _execute_live(self, cmd: List[str]) -> tuple:
         """Execute with live streaming output (no timeout, Ctrl+C to skip)."""
         if self.command_runner and self.config.get('verbosity', 0) >= 2:
-            result = self.command_runner.execute_streaming(cmd)
-            return result.return_code == 0 if result.return_code is not None else False, result.stdout
+            try:
+                if self.dashboard:
+                    # Use TUIDashboard if available
+                    result = self.dashboard.execute_tui(cmd, self.command_runner)
+                    return result.return_code == 0 if result.return_code is not None else False, result.stdout or ""
+                else:
+                    # Use streaming mode for real-time output
+                    result = self.command_runner.execute_streaming(cmd)
+                    return result.return_code == 0 if result.return_code is not None else False, result.stdout or ""
+            except Exception as e:
+                console.print(f"[red]Error in streaming execution: {e}[/red]")
+                return self._execute(cmd)
         else:
             return self._execute(cmd)
     
@@ -112,23 +123,53 @@ class WebRecon:
         use_streaming = self.config.get('verbosity', 0) >= 2 and self.command_runner
         
         if use_streaming:
-            # Run without Progress context to allow streaming output
-            console.print("[dim]Running in streaming mode - live command output enabled[/dim]")
-            
-            console.print("\n[yellow]🔍 Detecting technologies...[/yellow]")
-            results['technologies'], results['cms'] = self.detect_technologies()
-            
-            console.print("\n[yellow]🛡️ Detecting WAF...[/yellow]")
-            results['waf'] = self.detect_waf()
-            
-            console.print("\n[yellow]🔒 Analyzing SSL/TLS...[/yellow]")
-            results['ssl_info'] = self.analyze_ssl()
-            
-            console.print("\n[yellow]🔐 Checking security headers...[/yellow]")
-            results['headers'], results['security_headers'] = self.check_security_headers()
-            
-            console.print("\n[yellow]🤖 Fetching robots.txt...[/yellow]")
-            results['robots_txt'] = self.get_robots_txt()
+            # Try to use TUI Dashboard
+            try:
+                from core.command_runner import TUIDashboard
+                
+                self.dashboard = TUIDashboard()
+                self.dashboard.start()
+                
+                try:
+                    self.dashboard.add_output(f"🌐 Starting Web Reconnaissance: {self.target}")
+                    
+                    self.dashboard.add_output("🔍 Detecting technologies...")
+                    results['technologies'], results['cms'] = self.detect_technologies()
+                    
+                    self.dashboard.add_output("🛡️ Detecting WAF...")
+                    results['waf'] = self.detect_waf()
+                    
+                    self.dashboard.add_output("🔒 Analyzing SSL/TLS...")
+                    results['ssl_info'] = self.analyze_ssl()
+                    
+                    self.dashboard.add_output("🔐 Checking security headers...")
+                    results['headers'], results['security_headers'] = self.check_security_headers()
+                    
+                    self.dashboard.add_output("🤖 Fetching robots.txt...")
+                    results['robots_txt'] = self.get_robots_txt()
+                
+                finally:
+                    self.dashboard.stop()
+                    self.dashboard = None
+                    
+            except ImportError:
+                # Fallback to simple streaming
+                console.print("[dim]Running in streaming mode - live command output enabled[/dim]")
+                
+                console.print("\n[yellow]🔍 Detecting technologies...[/yellow]")
+                results['technologies'], results['cms'] = self.detect_technologies()
+                
+                console.print("\n[yellow]🛡️ Detecting WAF...[/yellow]")
+                results['waf'] = self.detect_waf()
+                
+                console.print("\n[yellow]🔒 Analyzing SSL/TLS...[/yellow]")
+                results['ssl_info'] = self.analyze_ssl()
+                
+                console.print("\n[yellow]🔐 Checking security headers...[/yellow]")
+                results['headers'], results['security_headers'] = self.check_security_headers()
+                
+                console.print("\n[yellow]🤖 Fetching robots.txt...[/yellow]")
+                results['robots_txt'] = self.get_robots_txt()
         else:
             # Use Progress spinner for non-verbose mode
             with Progress(

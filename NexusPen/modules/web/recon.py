@@ -125,8 +125,12 @@ class WebRecon:
         
         try:
             # Method 1: WhatWeb
+            cmd = ['whatweb', '--color=never', '-q', '-a', '3', self.target]
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
+                
             result = subprocess.run(
-                ['whatweb', '--color=never', '-q', '-a', '3', self.target],
+                cmd,
                 capture_output=True, text=True, timeout=60
             )
             
@@ -219,8 +223,12 @@ class WebRecon:
         """Detect Web Application Firewall."""
         try:
             # Use wafw00f
+            cmd = ['wafw00f', '-a', self.target]
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
+                
             result = subprocess.run(
-                ['wafw00f', '-a', self.target],
+                cmd,
                 capture_output=True, text=True, timeout=60
             )
             
@@ -307,8 +315,12 @@ class WebRecon:
         
         # Check for SSLyze if available
         try:
+            cmd = ['sslyze', '--regular', self.target.replace('https://', '').split('/')[0]]
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
+                
             result = subprocess.run(
-                ['sslyze', '--regular', self.target.replace('https://', '').split('/')[0]],
+                cmd,
                 capture_output=True, text=True, timeout=120
             )
             
@@ -599,9 +611,10 @@ class DirectoryFuzzer:
 
 
 # Module entry points
-def run(target: str, profile, results: list):
+# Module entry points
+def run(target: str, profile, results: list, config: Dict = None):
     """Main entry point for web recon module."""
-    recon = WebRecon(target)
+    recon = WebRecon(target, config)
     web_results = recon.run_full_recon()
     results.append({
         'module': 'web.recon',

@@ -109,6 +109,8 @@ class WindowsRecon:
         # Method 1: enum4linux
         try:
             cmd = ['enum4linux', '-a', self.target]
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
             
             if result.returncode == 0:
@@ -160,6 +162,8 @@ class WindowsRecon:
         # Method 2: smbclient for shares
         try:
             cmd = ['smbclient', '-L', f'//{self.target}', '-N']
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             
             for line in result.stdout.split('\n'):
@@ -180,6 +184,8 @@ class WindowsRecon:
         # Check for null session
         try:
             cmd = ['rpcclient', '-U', '', '-N', self.target, '-c', 'getusername']
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
             
             if 'Account Name' in result.stdout:
@@ -197,6 +203,8 @@ class WindowsRecon:
         # Check for SMB Signing
         try:
             cmd = ['nmap', '--script', 'smb2-security-mode', '-p', '445', self.target]
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             
             if 'signing enabled but not required' in result.stdout.lower():
@@ -225,6 +233,8 @@ class WindowsRecon:
         try:
             # Enumerate groups
             cmd = ['rpcclient', '-U', '', '-N', self.target, '-c', 'enumdomgroups']
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             
             group_matches = re.findall(r'group:\[([^\]]+)\]', result.stdout)
@@ -232,6 +242,8 @@ class WindowsRecon:
             
             # Get password policy
             cmd = ['rpcclient', '-U', '', '-N', self.target, '-c', 'getdompwinfo']
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             
             if 'min_password_length' in result.stdout:
@@ -258,6 +270,8 @@ class WindowsRecon:
         """Check for MS17-010 (EternalBlue) vulnerability."""
         try:
             cmd = ['nmap', '--script', 'smb-vuln-ms17-010', '-p', '445', self.target]
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
             
             if 'VULNERABLE' in result.stdout:
@@ -279,6 +293,8 @@ class WindowsRecon:
         try:
             # Use nmap script or custom check
             cmd = ['nmap', '--script', 'smb-vuln-zerologon', '-p', '445', self.target]
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
             
             if 'VULNERABLE' in result.stdout:
@@ -425,9 +441,10 @@ class WindowsPrivEsc:
 
 
 # Module entry point
-def run(target: str, profile, results: list):
+# Module entry point
+def run(target: str, profile, results: list, config: Dict = None):
     """Main entry point for Windows recon module."""
-    recon = WindowsRecon(target)
+    recon = WindowsRecon(target, config)
     windows_results = recon.run_full_recon()
     results.append({
         'module': 'windows.recon',

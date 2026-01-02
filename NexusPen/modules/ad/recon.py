@@ -137,6 +137,8 @@ class ADRecon:
         try:
             if self.domain:
                 cmd = ['nslookup', '-type=SRV', f'_ldap._tcp.dc._msdcs.{self.domain}']
+                if self.config.get('verbosity', 0) > 0:
+                    console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
                 result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
                 
                 dc_matches = re.findall(r'svr hostname\s*=\s*(\S+)', result.stdout, re.IGNORECASE)
@@ -159,6 +161,8 @@ class ADRecon:
         try:
             # Use ldapdomaindump if available
             cmd = ['ldapdomaindump', self.target, '-u', '', '-p', '', '--no-json']
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
             
         except (subprocess.TimeoutExpired, FileNotFoundError):
@@ -167,6 +171,8 @@ class ADRecon:
         # Alternative: Use enum4linux for null session
         try:
             cmd = ['enum4linux', '-U', '-G', self.target]
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
             
             if result.returncode == 0:
@@ -213,6 +219,8 @@ class ADRecon:
             # Use GetUserSPNs.py from Impacket
             cmd = ['GetUserSPNs.py', f'{self.domain}/', '-dc-ip', self.target, 
                    '-request', '-no-pass']
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
             
             # Parse output for SPN accounts
@@ -248,6 +256,8 @@ class ADRecon:
             # Use GetNPUsers.py from Impacket
             cmd = ['GetNPUsers.py', f'{self.domain}/', '-dc-ip', self.target,
                    '-no-pass', '-usersfile', '/dev/null']
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
             
             # Parse output
@@ -280,6 +290,8 @@ class ADRecon:
         try:
             # Use zerologon_tester or similar
             cmd = ['nmap', '--script', 'smb-vuln-zerologon', '-p', '445', self.target]
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
             
             if 'VULNERABLE' in result.stdout:
@@ -302,6 +314,8 @@ class ADRecon:
         try:
             # Check if EFS endpoints are accessible
             cmd = ['rpcclient', '-U', '', '-N', self.target, '-c', 'efsrpc']
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
             
             if 'NT_STATUS_ACCESS_DENIED' not in result.stderr:
@@ -323,6 +337,8 @@ class ADRecon:
         try:
             # Use Get-GPPPassword or similar
             cmd = ['nmap', '--script', 'smb-enum-shares,smb-ls', '-p', '445', self.target]
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
             
             if 'Groups.xml' in result.stdout or 'cpassword' in result.stdout.lower():
@@ -345,6 +361,8 @@ class ADRecon:
             # This would use certipy or similar tool
             cmd = ['certipy', 'find', '-u', '', '-p', '', '-dc-ip', self.target, 
                    '-vulnerable', '-stdout']
+            if self.config.get('verbosity', 0) > 0:
+                console.print(f"[grey50]$ {' '.join(cmd)}[/grey50]")
             result = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
             
             if 'ESC' in result.stdout:
@@ -498,14 +516,14 @@ class BloodHound:
 
 
 # Module entry point
-def run(target: str, profile, results: list):
+def run(target: str, profile, results: list, config: Dict = None):
     """Main entry point for AD recon module."""
     # Try to get domain from profile
     domain = None
     if hasattr(profile, 'hostname'):
         domain = profile.hostname
     
-    recon = ADRecon(target, domain)
+    recon = ADRecon(target, domain, config)
     ad_results = recon.run_full_recon()
     results.append({
         'module': 'ad.recon',
